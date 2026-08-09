@@ -14,7 +14,7 @@ function fail(msg: string): never {
   process.exit(1);
 }
 
-function parseToolJson(result: unknown): any {
+function parseToolJson(result: unknown): Record<string, unknown> {
   const content = (result as { content?: Array<{ type: string; text?: string }> })?.content;
   const text = content?.find((c) => c.type === "text")?.text;
   if (!text) fail(`tool result has no text content: ${JSON.stringify(result)}`);
@@ -77,12 +77,13 @@ async function main() {
   // preview correctly stops at POOL_NOT_VERIFIABLE, because this local-Anvil-address stand-in
   // pool isn't registered on the real validator yet (PRD.md §8, pending on real deployment).
   const quote = parseToolJson(await client.callTool({ name: "get_quote", arguments: { recipient, amountBaseUnits: "100000000" } }));
-  if (typeof quote.feeBps !== "string" || typeof quote.feeBaseUnits !== "string" || !quote.compliancePreview) {
+  const compliancePreview = quote.compliancePreview as { allowed?: boolean; reason?: string } | undefined;
+  if (typeof quote.feeBps !== "string" || typeof quote.feeBaseUnits !== "string" || !compliancePreview) {
     fail(`malformed quote: ${JSON.stringify(quote)}`);
   }
   if (quote.feeBps !== "50") fail(`expected the real on-chain feeBps (50), got ${JSON.stringify(quote)}`);
-  if (quote.compliancePreview.allowed !== false || quote.compliancePreview.reason !== "POOL_NOT_VERIFIABLE") {
-    fail(`expected allowed:false/POOL_NOT_VERIFIABLE (real pool not registered on real validator yet), got ${JSON.stringify(quote.compliancePreview)}`);
+  if (compliancePreview!.allowed !== false || compliancePreview!.reason !== "POOL_NOT_VERIFIABLE") {
+    fail(`expected allowed:false/POOL_NOT_VERIFIABLE (real pool not registered on real validator yet), got ${JSON.stringify(compliancePreview)}`);
   }
   console.log(`PASS: ${JSON.stringify(quote)}`);
 
@@ -113,7 +114,8 @@ async function main() {
   const audit = parseToolJson(
     await client.callTool({ name: "get_audit_report", arguments: { txHash: paymentResult.txHash, walletAddress: recipient } }),
   );
-  if (!audit.report || !audit.report.downloadUrl) {
+  const auditReport = audit.report as { downloadUrl?: string } | undefined;
+  if (!auditReport || !auditReport.downloadUrl) {
     console.log(`NOTE (non-fatal): download_travel_rule did not return a report for a synthetic local Anvil tx hash — expected, since Cleanverse's backend only has real records for real Monad testnet settlements. Response: ${JSON.stringify(audit)}`);
   } else {
     console.log(`PASS: ${JSON.stringify(audit)}`);
