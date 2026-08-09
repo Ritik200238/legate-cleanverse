@@ -67,7 +67,15 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", rpcUrl, agentMandateAddress, legateEscrowAddress });
 });
 
-const port = process.env.PORT ?? 4021;
-app.listen(port, () => {
-  console.log(`Legate backend listening on :${port}`);
-});
+// Vercel's Node runtime imports this module to get a request handler; it owns the HTTP
+// server itself, so calling app.listen() there would bind a port nothing ever connects to
+// and does nothing useful. Everywhere else (local dev, a real long-running host) still needs
+// the explicit listen.
+if (!process.env.VERCEL) {
+  const port = process.env.PORT ?? 4021;
+  app.listen(port, () => {
+    console.log(`Legate backend listening on :${port}`);
+  });
+}
+
+export default app;
