@@ -56,21 +56,23 @@ Legate ships one such module to prove the extension point is real rather than de
 
 **Privacy:** no personal or KYC data ever touches the chain — hashes and references only.
 
-### The one place we are not deep, stated before you find it
+### Where the line between "risk parameter" and "on-chain enforcement" actually sits
 
-Track 02 asks for CVI as *"a protocol entry condition **or** risk parameter."* Legate does the first thoroughly. It does **not** do graduated risk — tier 30 gets one cap, tier 50 gets a larger one.
+Track 02 asks for CVI as *"a protocol entry condition **or** risk parameter."* Legate does the first thoroughly — on-chain, at 4 distinct enforcement moments. On graduated risk, we drew the line exactly where the trust model forces it, and we're specific about where that line is rather than blurring it.
 
-That is not an oversight, and it is worth being precise about why. `complianceVerify()` returns a bare boolean. There is no per-user tier readable on-chain anywhere. The only ways to get graduated behaviour today are to have our backend assert each user's tier to the contract — which would make a compromised backend able to raise its own limits, destroying the one property this entire design exists to guarantee — or to fabricate a tier in the UI, which is worse.
+`complianceVerify()` returns a bare boolean; there is no per-user tier readable on-chain anywhere in Cleanverse's real interface. Asserting a tier from our backend to the contract would let a compromised backend raise its own limits — destroying the one property this whole design exists to guarantee. So on-chain, tier stays exactly what the chain can prove: the corridor's registered `min_tier: 30` floor, enforced by Cleanverse's own rule, never by us.
 
-So we do what the chain can actually prove: tier gates entry at the corridor's `min_tier: 30` threshold, enforced by Cleanverse's own rule rather than by us.
+What *is* real and shipped: a connected principal's actual live tier (already fetched via `queryApass`, previously only ever displayed) now drives graduated spend-cap **suggestions** in the Agent Console — tier 50+ (Legate's own "verified institutional/agent-operator" tier) gets meaningfully higher suggested caps than the corridor floor. It's honestly scoped as an off-chain UX signal the admin can freely override, not fabricated on-chain enforcement — because that's the actual boundary of what's provable today, not a boundary we're choosing not to mention.
 
-**The architecturally honest route to graduated limits** is multiple pools, each registered with the validator at a different `min_tier` and carrying its own `ComplianceGate` caps — the tier check stays entirely inside Cleanverse's rule engine, and Legate never asserts anything about anyone's identity. That is a deployment-and-registration change, not a contract change, and it is the next thing after the corridor is live.
+**The architecturally honest route to graduated *on-chain* limits** is multiple pools, each registered with the validator at a different `min_tier` and carrying its own `ComplianceGate` caps — the tier check stays entirely inside Cleanverse's rule engine, Legate never asserts anything about anyone's identity, and it's a deployment-and-registration change, not a contract change. Next after the corridor is live.
 
-We would rather show you a real gap with a real plan than a fake tier.
+We'd rather show you the real boundary and what we built right up against it than either fake a tier or leave the data sitting unused.
 
 ## What's verifiable right now
 
-- **104/104 Foundry tests, 100% branch coverage across every contract** — `forge coverage` is a one-command way for a judge to check this claim rather than take our word for it. Includes a real reentrancy attack and a real mandate-hijack exploit, both written as working PoCs before their fixes existed, and 19 covering the rule layer — the ones worth reading prove that a vetoed payment leaves no residue in corridor volume or any rule's state, and that a rule contract the gate was never compiled against still changes what the corridor refuses.
+- **108/108 Foundry tests, 100% line/branch/function coverage on every contract** — `forge coverage --report summary` is a one-command way for a judge to check this rather than take our word for it. Includes a real reentrancy attack and a real mandate-hijack exploit, both written as working PoCs before their fixes existed, and 19 covering the rule layer that prove a vetoed payment leaves no residue in corridor volume or any rule's state.
+- **A fuzzed invariant campaign, not just unit tests** — 8,192 real `initiate`/`settle` calls per run, checking the escrow's own fund accounting never drifts. Deliberately falsified before being trusted: the real accounting line was broken on purpose mid-build, the test caught it with an auto-shrunk 2-call repro, then the code was restored — see `DECISIONS.md`.
+- **A full Slither static-analysis pass**, every finding individually triaged — real issues fixed, remaining flags documented as false positives with the specific reasoning, not silently suppressed.
 - **`bash demo/run-demo.sh`** — all four demo scenes end to end in ~40 seconds, no credentials, no testnet funds. Every refusal it prints is asserted against the exact custom-error selector, so a generic failure fails the run rather than passing as a convincing "BLOCKED".
 - **Real end-to-end harnesses**, not mocks: real contracts on a real chain, a real MCP client driving the server over real stdio, real HTTP against the real backend.
 - **`DECISIONS.md`** — every verified fact with the call that verified it, and every claim that turned out false. Including two places where Cleanverse's published docs disagree with their live sandbox: the phantom Monad ramp support above, and a redeployed Monad A-Token whose decimals moved 6→18, which a live test caught and which would otherwise have shipped a per-transaction cap of 0.00000001 aUSDC.
