@@ -47,6 +47,9 @@ export interface ApiConfig {
   adminApiKey?: string;
 }
 
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const PAYMENT_ID_RE = /^0x[0-9a-fA-F]{64}$/;
+
 export function createApiRouter(config: ApiConfig): Router {
   const router = Router();
   const provider = new JsonRpcProvider(config.rpcUrl);
@@ -59,6 +62,10 @@ export function createApiRouter(config: ApiConfig): Router {
 
   router.get("/recipient/:address", async (req: Request, res: Response) => {
     const { address } = req.params;
+    if (!ADDRESS_RE.test(address)) {
+      res.status(400).json({ error: "address must be a 20-byte hex string" });
+      return;
+    }
     try {
       const apass = await queryApass(config.cleanverse, config.chain, address);
       if (!apass) {
@@ -99,6 +106,14 @@ export function createApiRouter(config: ApiConfig): Router {
     const { sender, recipient, amount } = req.query;
     if (typeof sender !== "string" || typeof recipient !== "string" || typeof amount !== "string") {
       res.status(400).json({ error: "sender, recipient, and amount query params are required" });
+      return;
+    }
+    if (!ADDRESS_RE.test(sender) || !ADDRESS_RE.test(recipient)) {
+      res.status(400).json({ error: "sender and recipient must be 20-byte hex addresses" });
+      return;
+    }
+    if (!/^[0-9]+$/.test(amount)) {
+      res.status(400).json({ error: "amount must be a non-negative integer string (base units)" });
       return;
     }
     try {
@@ -209,7 +224,7 @@ export function createApiRouter(config: ApiConfig): Router {
 
   router.get("/payment/:paymentId", async (req: Request, res: Response) => {
     const { paymentId } = req.params;
-    if (!/^0x[0-9a-fA-F]{64}$/.test(paymentId)) {
+    if (!PAYMENT_ID_RE.test(paymentId)) {
       res.status(400).json({ error: "paymentId must be a 32-byte hex string" });
       return;
     }
@@ -282,7 +297,7 @@ export function createApiRouter(config: ApiConfig): Router {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    if (!/^0x[0-9a-fA-F]{64}$/.test(paymentId)) {
+    if (!PAYMENT_ID_RE.test(paymentId)) {
       res.status(400).json({ error: "paymentId must be a 32-byte hex string" });
       return;
     }
@@ -332,6 +347,10 @@ export function createApiRouter(config: ApiConfig): Router {
 
   router.get("/mandate/:agentAddress", async (req: Request, res: Response) => {
     const { agentAddress } = req.params;
+    if (!ADDRESS_RE.test(agentAddress)) {
+      res.status(400).json({ error: "agentAddress must be a 20-byte hex string" });
+      return;
+    }
     try {
       const m = await mandateContract.getMandate(agentAddress);
       res.json({
