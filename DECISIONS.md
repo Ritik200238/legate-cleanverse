@@ -621,6 +621,13 @@ User asked for a genuine build-quality pass ("everything we've built must work r
 
 Also discovered mid-session and fixed separately: the automated health-check polling loop tripped Vercel's own bot-mitigation firewall on both projects — logged and resolved in the entry above.
 
+## Final fact-check pass on SUBMISSION.md before it goes out by email (2026-08-09)
+User asked for a genuinely final, perfect pass since this document is about to be sent directly to Cleanverse. Re-checked every external claim live rather than trusting what was already written:
+- A quoted phrase from REQ.md had an inserted word ("a protocol entry condition" vs. the real "protocol entry condition") — quotation marks imply verbatim, fixed to match exactly.
+- The Circle/16-wallets citation claimed "the only recourse was a legal petition" — read the actual article: the real story is one wallet got reversed after public backlash from an independent researcher (ZachXBT), the rest just stayed frozen with no stated process. Corrected to the real story, which is arguably a stronger example of "freeze with no defined recourse" than the original claim.
+- **The Safe "~$27B" figure, repeated in both README.md and SUBMISSION.md, was stale.** Checked Safe's own live homepage banner (the primary source, not a secondary article): they now state **"$60B+ in Total Value Locked"**. A web search corroborated this is a real, current figure (not a mismeasurement) and that the ~130M-transactions figure was accurate as a single-quarter record, not a lifetime total. Fixed in both docs — this was actually understating the analogy's strength, not overstating it.
+- Verified all 4 external links in SUBMISSION.md (World Bank remittance data, the two Circle freeze articles, Aave Horizon) actually resolve to real, on-topic pages via a real browser — curl reported false 403/429s on two of them, which turned out to be bot-protection on the source sites, not dead links.
+
 ## Next action (current)
 1. **User action needed** — record the demo video. `demo/run-demo.sh` (local mode) still works as a read-along; `MODE=monad` against the now-real deployment is also possible but needs A-Pass-holding test wallets Legate does not currently have (checked this session — not a quick fix, real KYC onboarding required).
 2. **User action needed** — send the submission email to isaac@cleanverse.com before the Aug 9 23:59 UTC deadline, with the real addresses already filled in (`SUBMISSION_EMAIL_DRAFT.md`). **[RECON, unresolved]** — double-check this address isn't stale before sending.
