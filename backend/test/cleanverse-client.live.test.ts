@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   queryDepositAtokenList,
   queryApass,
+  verifyApass,
   validatorIsPaused,
   queryRampCountries,
   queryRampFiatCurrencies,
@@ -23,25 +24,39 @@ const config: CleanverseConfig = {
 };
 
 describe("Cleanverse live sandbox — client correctness", () => {
-  // This test earns its keep: on 2026-08-08 it failed against the live sandbox and that
-  // failure was the ONLY signal that Cleanverse had redeployed Monad's aUSDC — new address,
-  // and decimals moved 6 -> 18. Their published docs still show the old address. Everything
-  // downstream (deploy-script caps, the web app's amount formatting, the test double) was
-  // silently wrong by 10^12 until this went red. Asserting decimals explicitly now, not just
-  // the address, so the more dangerous half of that change can't slip through on its own.
-  it("queryDepositAtokenList returns the real Monad aUSDC address and decimals", async () => {
+  // This test earns its keep twice over. First: on 2026-08-08 it failed against the live
+  // sandbox, and that failure was the ONLY signal Cleanverse had redeployed Monad's aUSDC —
+  // new address, decimals 6 -> 18. Second: hours later on 2026-08-09, the address it had just
+  // confirmed FLIPPED BACK to the original one, stable across repeated re-checks — see
+  // DECISIONS.md's "Cleanverse's own aUSDC address flip-flopped" entry for the full trail.
+  //
+  // A test that pins one specific address as ground truth would now be wrong by construction
+  // — Cleanverse's own backend has proven it can change its mind within a single day. What's
+  // asserted instead is the invariant that actually protects downstream code: whichever
+  // address comes back, its address and decimals must belong to one of the two real,
+  // independently-verified states, never an unrecognized third value or a mismatched pairing.
+  // The deploy pipeline reads decimals() live from the chain regardless (DeployMonadTestnet.s.sol),
+  // so this consistency check — not a specific address — is what stands between a real state and
+  // a broken one.
+  it("queryDepositAtokenList returns a real Monad aUSDC entry (address+decimals internally consistent)", async () => {
     const result = await queryDepositAtokenList(config, "monad");
     expect(result.chain).toBe("monad");
     expect(result.tokens.length).toBeGreaterThan(0);
     const usdcEntry = result.tokens.find((t) => t.origin_token.symbol.toLowerCase() === "usdc");
     expect(usdcEntry).toBeDefined();
-    expect(usdcEntry!.atoken.address.toLowerCase()).toBe("0xfa96de5b8f434c26fdff953303dd66ff80af1026");
-    expect(usdcEntry!.atoken.decimals).toBe(18);
-    // The wrapped origin token is still 6-decimal USDC — the wrapper changed, the underlying
-    // did not. Pinned so a future divergence is attributed to the right side of the pair.
+
+    // The wrapped origin token (real USDC) has been stable across every observed state.
     expect(usdcEntry!.origin_token.address.toLowerCase()).toBe("0x534b2f3a21130d7a60830c2df862319e593943a3");
     expect(usdcEntry!.origin_token.decimals).toBe(6);
     expect(usdcEntry!.accesscore_address.toLowerCase()).toBe("0x8f118338a1fa41e7fa86be19a4e8b99ed58a6ecc");
+
+    const KNOWN_ATOKEN_STATES: Record<string, number> = {
+      "0xfa96de5b8f434c26fdff953303dd66ff80af1026": 18, // observed 2026-08-09, morning
+      "0xac0893567d43c3e7e6e35a72803df05416c1f20d": 6, // observed 2026-08-09, afternoon — reversion
+    };
+    const addr = usdcEntry!.atoken.address.toLowerCase();
+    expect(Object.keys(KNOWN_ATOKEN_STATES)).toContain(addr);
+    expect(usdcEntry!.atoken.decimals).toBe(KNOWN_ATOKEN_STATES[addr]);
   });
 
   it("queryApass returns null (not throw) for an unregistered address", async () => {
@@ -54,6 +69,23 @@ describe("Cleanverse live sandbox — client correctness", () => {
     const result = await queryApass(config, "monad", "0x0000000000000000000000000000000000dEaD");
     expect(result).not.toBeNull();
     expect(result!.status).toBe(1); // active
+  });
+
+  // Never called from the live request path (grep backend/src confirms it) — the compliance
+  // pipeline uses validatorVerify instead. That turned out to matter: verify_apass keeps its
+  // own internal atoken registry, separate from query_deposit_atoken_list's, and on 2026-08-09
+  // the two disagreed WITHIN THE SAME DAY about which Monad aUSDC address is canonical — see
+  // DECISIONS.md's "Cleanverse's own aUSDC address flip-flopped" entry for the full trail. The
+  // `base` case below is used as the control specifically because it stayed stable throughout;
+  // asserting anything Monad-specific here would pin a fact this session watched move.
+  it("verifyApass works on the known-good base/aUSDC pairing (stable control case)", async () => {
+    const result = await verifyApass(
+      config,
+      "base",
+      "0xaC0893567D43C3E7e6e35a72803df05416C1f20D",
+      "0x000000000000000000000000000000000000dEaD",
+    );
+    expect(result.code).toBe(4); // "apass verify success"
   });
 
   it("validatorIsPaused does not throw for an arbitrary pool address (returns a boolean)", async () => {
