@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {ComplianceGate} from "../src/ComplianceGate.sol";
 import {IComplianceRule} from "../src/interfaces/IComplianceRule.sol";
 import {MockValidator} from "./mocks/MockValidator.sol";
+import {DenylistRule} from "./mocks/MockRules.sol";
 
 contract ComplianceGateTest is Test {
     ComplianceGate gate;
@@ -171,5 +172,23 @@ contract ComplianceGateTest is Test {
 
         (bool allowed,,) = gate.previewCheck(sender, recipient, PER_TX_CAP);
         assertTrue(allowed, "a new day must reset the corridor volume the preview sees");
+    }
+
+    /// rules() itself — the read the Auditor view and anyone verifying corridor policy without
+    /// trusting a README actually depends on — had no direct test; every other test only
+    /// exercised registerRule/unregisterRule's side effects, never read the array back.
+    function test_Rules_ReturnsEveryRegisteredRuleInOrder() public {
+        DenylistRule ruleA = new DenylistRule();
+        DenylistRule ruleB = new DenylistRule();
+
+        vm.startPrank(admin);
+        gate.registerRule(ruleA);
+        gate.registerRule(ruleB);
+        vm.stopPrank();
+
+        IComplianceRule[] memory registered = gate.rules();
+        assertEq(registered.length, 2);
+        assertEq(address(registered[0]), address(ruleA));
+        assertEq(address(registered[1]), address(ruleB));
     }
 }

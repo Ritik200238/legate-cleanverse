@@ -104,4 +104,25 @@ contract TravelRuleAnchorTest is Test {
         vm.expectRevert(TravelRuleAnchor.ZeroAddress.selector);
         new TravelRuleAnchor(address(0), admin);
     }
+
+    /// @notice grantAnchor() itself — every other test relies on `admin` already holding
+    ///         ANCHOR_ROLE from construction, so the grant path was never actually exercised.
+    ///         A second signer (the real deploy grants this to a dedicated backend key,
+    ///         distinct from the deployer) must be refused before the grant and succeed after.
+    function test_GrantAnchor_LetsANewSignerAnchor() public {
+        address backendSigner = makeAddr("backendSigner");
+
+        vm.prank(backendSigner);
+        vm.expectRevert();
+        anchorContract.anchor(settledPaymentId, keccak256("a"), keccak256("b"));
+
+        vm.prank(admin);
+        anchorContract.grantAnchor(backendSigner);
+
+        vm.prank(backendSigner);
+        anchorContract.anchor(settledPaymentId, keccak256("a"), keccak256("b"));
+
+        TravelRuleAnchor.Anchor memory a = anchorContract.getAnchor(settledPaymentId);
+        assertGt(a.anchoredAt, 0);
+    }
 }
