@@ -90,22 +90,55 @@ class ApiError extends Error {
   }
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${resolveBase()}${path}`);
-  const json = await res.json();
-  if (!res.ok) throw new ApiError(res.status, json.error ?? `Request failed with ${res.status}`);
+/**
+ * Found by actually clicking through the hosted preview, not by any server-side check: with no
+ * backend configured, resolveBase() falls back to http://127.0.0.1:4021 — a real visitor's own
+ * machine, not this deployment's server. An unguarded `await res.json()` on that failed request
+ * surfaced as a raw, uncaught TypeError straight in the UI.
+ *
+ * The first fix here (wrap fetch in try/catch) was itself incomplete, caught live in the same
+ * session: a normal browser rejects a blocked/unreachable fetch, which the try/catch below
+ * handles — but this was observed in an environment where fetch instead *resolved* to a falsy
+ * value rather than rejecting. `res = await fetch(...)` then "succeeded" with res undefined,
+ * and the very next line (res.json()) threw — inside a catch block that itself read
+ * `res.status`, so the catch handler crashed too. Two bugs stacked: don't assume a resolved
+ * fetch() is ever a real Response, on top of not assuming it resolves at all. The explicit
+ * `if (!res)` below is what actually closes it, regardless of which way a given environment's
+ * fetch fails.
+ */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response | undefined;
+  try {
+    res = await fetch(`${resolveBase()}${path}`, init);
+  } catch {
+    // fall through to the !res check below — same handling either way
+  }
+  if (!res) {
+    throw new ApiError(0, "Could not reach the Legate backend. This preview may not be connected to a live deployment yet.");
+  }
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError(res.status, `Backend returned an unreadable response (status ${res.status}).`);
+  }
+  if (!res.ok) {
+    const message = typeof json === "object" && json && "error" in json ? String((json as { error: unknown }).error) : `Request failed with ${res.status}`;
+    throw new ApiError(res.status, message);
+  }
   return json as T;
 }
 
+async function get<T>(path: string): Promise<T> {
+  return request<T>(path);
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${resolveBase()}${path}`, {
+  return request<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const json = await res.json();
-  if (!res.ok) throw new ApiError(res.status, json.error ?? `Request failed with ${res.status}`);
-  return json as T;
 }
 
 export const api = {
