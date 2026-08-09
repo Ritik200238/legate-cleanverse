@@ -27,7 +27,8 @@ Remove A-Pass (CVI) and counterparties are anonymous — the rail becomes an ord
         LEGATE POLICY ENGINE  (backend — informational only)
         • Resolve A-Pass for both parties: POST /query_apass
         • Preview the on-chain compliance check off-chain (same logic, no gas)
-        • Evaluate Legate's own dynamic rules (velocity, daily/lifetime caps)
+        • Run ComplianceGate.previewCheck — all three enforcement layers as a
+          view call, so the preview cannot disagree with the contract
         • Return a quote (fee, FX estimate) — never a cryptographic attestation
           the contracts trust blindly
                           ▼
@@ -56,7 +57,7 @@ Remove A-Pass (CVI) and counterparties are anonymous — the rail becomes an ord
 
 | Capability | Depth | How |
 |---|---|---|
-| **CVI (A-Pass)** | Deep | Both sender and recipient must hold a valid A-Pass; real tier/subTier fields gate the corridor; revocation reaches funds already in flight (settlement re-checks on-chain regardless of any poller). |
+| **CVI (A-Pass)** | Deep | The protocol's **entry condition**, not a login. Both parties must clear `complianceVerify()` at escrow *and again at settlement*, so revocation reaches funds already in flight — no poller, no admin, nobody needing to notice in time. Real tier/subTier fields gate the corridor (`min_tier: 30`, countries `["MY","PH"]`). |
 | **CVA (A-Token)** | Deep | The *only* asset `LegateEscrow` accepts (`0xFA96de…1026`, 18 decimals). Transfer rules are a real on-chain `RuleV2` enforced by the A-Token's own transfer hook — not API-side gating. **Note:** Cleanverse redeployed this token; their docs still list the old 6-decimal address. Caught by a live test, verified against Monad RPC, written up in `DECISIONS.md`. Deploy-time caps now read the token's real `decimals()` instead of hardcoding it. |
 | **CCP (on-chain validator)** | Deep | `IAPassComplianceValidator.complianceVerify(pool, address)` called directly, synchronously, on-chain — no off-chain bridge. Plus `download_travel_rule`, hash-anchored post-settlement. |
 | **Playground** | Partial, honestly framed | Real, but a learning/reference tool, not a rule-design tool — `RuleV2` is configured directly against the validator, not "designed in Playground." No demo footage claimed here because there's nothing to film. |
