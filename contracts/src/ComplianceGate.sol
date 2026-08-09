@@ -125,8 +125,9 @@ contract ComplianceGate is AccessControl {
     ///         `unregisterRule` is the escape hatch and is why registration is reversible.
     function registerRule(IComplianceRule rule) external onlyRole(ADMIN_ROLE) {
         if (address(rule) == address(0)) revert ZeroAddress();
-        if (_rules.length >= MAX_RULES) revert TooManyRules(MAX_RULES);
-        for (uint256 i = 0; i < _rules.length; ++i) {
+        uint256 count = _rules.length;
+        if (count >= MAX_RULES) revert TooManyRules(MAX_RULES);
+        for (uint256 i = 0; i < count; ++i) {
             if (address(_rules[i]) == address(rule)) revert RuleAlreadyRegistered(address(rule));
         }
         _rules.push(rule);
