@@ -234,4 +234,72 @@ contract AgentMandateTest is Test {
         AgentMandate.Mandate memory m = mandateContract.getMandate(agent);
         assertEq(m.principal, newPrincipal);
     }
+
+    // --- Guards: line coverage was 98% while branch coverage was 68.75% -- the happy side of
+    //     every zero-address and boundary check was exercised, the refusing side mostly was
+    //     not. AgentMandate is the module half of the Safe module/guard pattern this project's
+    //     own pitch leans on; its untested refusals deserved the same scrutiny LegateEscrow's
+    //     already got. ---
+
+    function test_RevertWhen_ConstructedWithAnyZeroAddress() public {
+        vm.expectRevert(AgentMandate.ZeroAddress.selector);
+        new AgentMandate(address(0), address(escrow), address(escrow), admin);
+        vm.expectRevert(AgentMandate.ZeroAddress.selector);
+        new AgentMandate(address(validator), address(0), address(escrow), admin);
+        vm.expectRevert(AgentMandate.ZeroAddress.selector);
+        new AgentMandate(address(validator), address(escrow), address(0), admin);
+        vm.expectRevert(AgentMandate.ZeroAddress.selector);
+        new AgentMandate(address(validator), address(escrow), address(escrow), address(0));
+    }
+
+    function test_RevertWhen_CreatingMandateForZeroAddressAgent() public {
+        vm.prank(principal);
+        vm.expectRevert(AgentMandate.ZeroAddress.selector);
+        mandateContract.createMandate(address(0), PER_TX_CAP, DAILY_CAP, TOTAL_CAP, uint64(block.timestamp + 30 days));
+    }
+
+    /// Distinct from test_RevertWhen_MandateExpired above, which times out an already-created
+    /// mandate at execute(). This is the other half: createMandate() itself must refuse an
+    /// expiry that is already in the past, not silently create a mandate that can never be used.
+    function test_RevertWhen_CreatingMandateWithExpiryInThePast() public {
+        vm.warp(1_700_000_000); // clear of timestamp 0 edge cases
+        vm.prank(principal);
+        vm.expectRevert(AgentMandate.ExpiryInPast.selector);
+        mandateContract.createMandate(agent, PER_TX_CAP, DAILY_CAP, TOTAL_CAP, uint64(block.timestamp - 1));
+    }
+
+    function test_RevertWhen_CreatingMandateWithExpiryExactlyNow() public {
+        vm.prank(principal);
+        vm.expectRevert(AgentMandate.ExpiryInPast.selector);
+        mandateContract.createMandate(agent, PER_TX_CAP, DAILY_CAP, TOTAL_CAP, uint64(block.timestamp));
+    }
+
+    /// suspendByMirror returns false rather than reverting on an already-inactive mandate, so a
+    /// batch revocation sweep across many agents doesn't abort on one that's already suspended
+    /// or was never created. Prove the false branch actually returns, not just that a mandate
+    /// exists to suspend once.
+    function test_SuspendByMirror_ReturnsFalseForAlreadyInactiveMandate() public {
+        address mirror = makeAddr("mirror");
+        vm.prank(admin);
+        mandateContract.setMirror(mirror);
+
+        // Never created at all -- .active defaults to false on an empty struct.
+        vm.prank(mirror);
+        bool result = mandateContract.suspendByMirror(agent);
+        assertFalse(result);
+
+        // Created, then already suspended once -- the second call must also return false, not
+        // revert or emit a second MandateSuspended for a mandate that's already down.
+        _createMandate();
+        vm.prank(mirror);
+        assertTrue(mandateContract.suspendByMirror(agent));
+        vm.prank(mirror);
+        assertFalse(mandateContract.suspendByMirror(agent));
+    }
+
+    function test_RevertWhen_SettingZeroAddressMirror() public {
+        vm.prank(admin);
+        vm.expectRevert(AgentMandate.ZeroAddress.selector);
+        mandateContract.setMirror(address(0));
+    }
 }
