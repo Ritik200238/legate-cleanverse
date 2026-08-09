@@ -16,7 +16,7 @@ The use case built on that primitive is a Malaysia↔Philippines remittance corr
 
 ## The problem
 
-A Malaysian worker sending money home to Manila pays 6–7% and waits days. The correspondent-banking rail that makes it slow is also what makes it compliant — Travel Rule data, sanctions screening, counterparty identity. Stablecoins remove the cost and the delay by removing exactly that layer, which is why no licensed remittance operator can put a customer on one.
+A Malaysian worker sending money home to Manila pays a real fee and waits real days — the [World Bank's Remittance Prices Worldwide](https://remittanceprices.worldbank.org/) puts the global average cost of sending remittances at **6.36%** of the amount sent. The correspondent-banking rail that makes it slow is also what makes it compliant — Travel Rule data, sanctions screening, counterparty identity. Stablecoins remove the cost and the delay by removing exactly that layer, which is why no licensed remittance operator can put a customer on one.
 
 The same wall now blocks a second, newer user. AI agents transact — 160M+ transactions a year and climbing — and have no compliant way to hold or move value. The workaround everyone reaches for is a custodial account with a spending limit enforced by a prompt. A prompt is not a control.
 
