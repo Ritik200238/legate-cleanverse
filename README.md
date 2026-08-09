@@ -89,7 +89,8 @@ That walks PRD §6's four scenes against real contracts on a local chain: a sett
 ## Repository layout
 
 ```
-contracts/   Foundry project — 6 Solidity contracts + a rule module, 73 tests (see below)
+contracts/   Foundry project — 6 contracts (5 rail + 1 pluggable rule
+             module), 2 interfaces, 73 tests (see below)
 backend/     Node/TypeScript — Cleanverse REST client, policy engine, x402
              middleware, MCP server (6 tools), REST API for the web app
 web/         Next.js 16 — Send, Claim, Agent Console, Auditor, and the
@@ -101,7 +102,7 @@ DECISIONS.md Running decision log — every verified fact, every bug found
 
 ## Smart contracts
 
-Contracts kept separate on purpose — matches Cleanverse's own Factory/Pool separation pattern and lets a judge audit one small, single-responsibility contract at a time.
+Six contracts — five that make up the rail, plus one pluggable rule module that exists to prove the rail is extensible. Kept separate on purpose — matches Cleanverse's own Factory/Pool separation pattern and lets a judge audit one small, single-responsibility contract at a time.
 
 - **`LegateEscrow`** — the payment lifecycle (`Escrowed → Settled | Frozen | Refunded`). Accepts only the A-Token. Checks-effects-interactions on every state-changing function that moves funds; `ReentrancyGuard` where it matters (proven by a real reentrancy-attack test, not just asserted). If a recipient never claims, `reclaimExpired()` lets the **original sender** take their own funds back after a 30-day on-chain claim window — no admin in the loop, which is the difference between a remittance rail and a place money goes to get stuck.
 - **`ComplianceGate`** — the guard. Three layers, each owned by whoever is accountable for it: Cleanverse's validator answers *who*, this contract answers *how much and how often*, and registered `IComplianceRule` modules answer whatever the operator's own licence demands. Structurally this is Safe's guard — it can only refuse, never initiate.
