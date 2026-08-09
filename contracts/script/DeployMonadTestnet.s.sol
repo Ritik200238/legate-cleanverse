@@ -8,6 +8,7 @@ import {ComplianceGate} from "../src/ComplianceGate.sol";
 import {AgentMandate} from "../src/AgentMandate.sol";
 import {CVIRegistryMirror} from "../src/CVIRegistryMirror.sol";
 import {TravelRuleAnchor} from "../src/TravelRuleAnchor.sol";
+import {StructuringRule} from "../src/rules/StructuringRule.sol";
 
 /// @notice Deploys the real Legate stack to real Monad testnet, wired to Cleanverse's real,
 ///         live-verified contracts — no mocks. Addresses confirmed live via
@@ -30,7 +31,7 @@ contract DeployMonadTestnet is Script {
     // the Monad A-Token, and the docs snapshot is stale. Verified by calling the real
     // query_deposit_atoken_list({chain:"monad"}) and then confirming symbol()/decimals()
     // directly against Monad RPC. Do not "correct" this back to the docs' address.
-    address constant A_TOKEN = 0xFA96de5b8f434c26fdFf953303dD66ff80AF1026; // aUSDC — the only asset LegateEscrow accepts
+    address constant A_TOKEN = 0xfA96De5B8F434c26FdFf953303dD66fF80af1026; // aUSDC — the only asset LegateEscrow accepts
     address constant COMPLIANCE_VALIDATOR = 0xaC7e5179C2C7f03f209136886c172eb34F161792; // IAPassComplianceValidator
 
     // Corridor limits, in whole aUSDC. Scaled by the token's REAL decimals at deploy time
@@ -67,6 +68,22 @@ contract DeployMonadTestnet is Script {
 
         TravelRuleAnchor anchorContract = new TravelRuleAnchor(address(escrow), deployer);
 
+        // Layer 3: the operator's own policy, registered rather than hardcoded. Structuring
+        // detection ships as the default corridor rule because it is the pattern a MY->PH
+        // remittance corridor is most likely to be abused for, and because neither of the
+        // other two layers can express it — Cleanverse's RuleV2 is static, and the gate's caps
+        // are aggregates that many-small-transfers is specifically designed to slip under.
+        //
+        // Thresholds: more than 6 transfers between the same pair, in one rolling day,
+        // cumulatively at or above 5,000 aUSDC. Both conditions must hold — a family sending
+        // weekly grocery money trips neither, a smurfing pattern trips both.
+        //
+        // Deliberately NOT registered in DeployLocal: the local script backs the end-to-end
+        // test suite, and a stateful velocity rule would make those runs order-dependent.
+        // The rule has its own dedicated suite (test/ComplianceRules.t.sol) instead.
+        StructuringRule structuringRule = new StructuringRule(address(gate), 1 days, 6, 5_000 * unit);
+        gate.registerRule(structuringRule);
+
         // Optional: grant POLLER_ROLE to the real revocation-poller service's signing key
         // (backend/src/poller/revocation-poller.ts). Left ungranted if not supplied.
         address pollerAddress = vm.envOr("POLLER_ADDRESS", address(0));
@@ -86,6 +103,7 @@ contract DeployMonadTestnet is Script {
         console.log("agentMandate:", address(mandate));
         console.log("registryMirror:", address(mirror));
         console.log("travelRuleAnchor:", address(anchorContract));
+        console.log("structuringRule (registered operator policy):", address(structuringRule));
         console.log("deployer:", deployer);
         console.log("");
         console.log("NEXT STEP (not done by this script): register 'escrow' as a validator pool");

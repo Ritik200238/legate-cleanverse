@@ -12,6 +12,22 @@ import {LegateEscrow} from "./LegateEscrow.sol";
 ///         see DECISIONS.md) — this is not a fallback, it IS the plan: the reference
 ///         implementation of a capability Cleanverse doesn't provide. See PRD.md §5.1, §6
 ///         (Scene 4), REQ.md capability #8.
+///
+/// @dev    Structurally this is Safe's **module**, and `ComplianceGate` is the matching
+///         **guard**. The distinction is the whole architecture and it is worth naming
+///         explicitly, because it is the pattern that has already been proven at scale — Safe
+///         secured ~$27B across ~130M transactions in Q2 2026 on exactly this split:
+///
+///           module (this contract) — CAN INITIATE a payment without holding the principal's
+///                                    key, bounded by caps that live in storage here
+///           guard  (ComplianceGate) — CANNOT initiate anything, only refuse
+///
+///         An agent needs both halves and neither alone is sufficient. A module without a
+///         guard is an unbounded bot; a guard without a module means the human still has to
+///         sign every payment, which defeats the point of an agent. The reason this beats a
+///         prompt-level spending limit is not that the code is better — it is that the agent
+///         never holds the key and cannot reach the ledger except through a contract that
+///         counts.
 contract AgentMandate is AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MONITOR_ROLE = keccak256("MONITOR_ROLE"); // granted to CVIRegistryMirror
