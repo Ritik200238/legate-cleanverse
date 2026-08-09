@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Nav } from "@/components/nav";
 import { DecimalsGuard } from "@/components/decimals-guard";
+import { DeploymentStatus } from "@/components/deployment-status";
 import { WalletProvider } from "@/lib/wallet-context";
 import "./globals.css";
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Nav />
           <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8">
             <DecimalsGuard />
+            <DeploymentStatus />
             {children}
           </main>
         </WalletProvider>
