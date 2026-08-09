@@ -25,8 +25,6 @@ export default function AuditorPage() {
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [anchoring, setAnchoring] = useState(false);
-  const [anchorError, setAnchorError] = useState<string | null>(null);
 
   async function lookup() {
     setError(null);
@@ -47,21 +45,6 @@ export default function AuditorPage() {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleAnchor() {
-    if (!payment) return;
-    setAnchorError(null);
-    setAnchoring(true);
-    try {
-      await api.anchorTravelRule(payment.paymentId);
-      const refreshed = await api.getPayment(payment.paymentId);
-      setPayment(refreshed);
-    } catch (err) {
-      setAnchorError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      setAnchoring(false);
     }
   }
 
@@ -134,17 +117,16 @@ export default function AuditorPage() {
                   <div className="flex justify-between"><span className="text-muted-foreground">Anchored</span><span>{formatTimestamp(payment.travelRuleAnchor.anchoredAt)}</span></div>
                 </>
               ) : payment.state === "Settled" ? (
-                <div className="print:hidden flex flex-col gap-2">
+                <div className="print:hidden">
                   <Alert>
                     <AlertTitle>Not yet anchored</AlertTitle>
                     <AlertDescription>
-                      Pull Cleanverse&apos;s real compliance report for this settlement and anchor its hash on-chain.
+                      Anchoring pulls Cleanverse&apos;s real compliance report for this settlement and writes its hash
+                      on-chain. This is a server-signed action — <code className="font-mono text-xs">TravelRuleAnchor.anchor()</code>{" "}
+                      is <code className="font-mono text-xs">ANCHOR_ROLE</code>-gated on-chain by design, run by whoever
+                      operates this corridor, not triggered from a public page. Check back after the operator anchors it.
                     </AlertDescription>
                   </Alert>
-                  {anchorError && <p className="text-sm text-destructive">{anchorError}</p>}
-                  <Button size="sm" onClick={handleAnchor} disabled={anchoring} className="self-start">
-                    {anchoring ? "Anchoring…" : "Fetch report & anchor"}
-                  </Button>
                 </div>
               ) : (
                 <p className="text-muted-foreground">Anchoring is only available once a payment is Settled.</p>
