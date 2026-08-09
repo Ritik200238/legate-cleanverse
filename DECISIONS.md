@@ -504,6 +504,12 @@ That left `LegateEscrow` at 94.74% — one branch, previously written off as ful
 
 **Result: 100.00% branch coverage, all six contracts, zero exceptions.** 104 tests, all green. `forge coverage` is now a claim worth stating plainly in `SUBMISSION.md` rather than leaving buried in this log — a one-command way for a judge to check it themselves rather than take the number on faith.
 
+## 2026-08-09 — Checked contract sizes against the deployment limit, before deploying rather than after
+
+Never verified this. EIP-170 caps deployed contract runtime bytecode at 24,576 bytes — exceed it and deployment reverts outright, regardless of gas, regardless of anything else being correct. Worth ruling out before the deploy attempt rather than discovering it during one and wasting real MON on a failed broadcast.
+
+`forge build --sizes`: largest real contract is `LegateEscrow` at 8,046 bytes, 16,530 bytes of margin under the cap. `ComplianceGate` at 6,052. Every contract has more than double its own size in headroom. No risk here — logged as a checked-and-cleared item, not left as an unstated assumption.
+
 ## Next action (current)
 1. **User action needed** — fund `0xb3E18D617F72121a2cf5e05AAed1dCA07Fbc6d5E` via faucet.monad.xyz (CAPTCHA-gated). **Before running the deploy script, re-verify the A-Token address per the entry immediately above — it has changed within a single day already.** Then run `DEPLOYER_PRIVATE_KEY=... [A_TOKEN_ADDRESS=0x... if it changed] forge script script/DeployMonadTestnet.s.sol:DeployMonadTestnet --rpc-url https://testnet-rpc.monad.xyz --broadcast` from `contracts/`, then `backend/scripts/register-validator.ts` with the resulting escrow address. This also unblocks the Vercel deployment's `DeploymentStatus` banner clearing and the live receipt permalinks.
 2. **User action needed** — record the demo video (explicitly the user's own task, see this session). `demo/run-demo.sh` exists specifically to make this a read-along.
