@@ -341,7 +341,7 @@ contract ComplianceRulesTest is Test {
         escrow.initiate(recipient, 100e18);
     }
 
-    function test_PreviewReportsAllowedWhenEverythingPasses() public {
+    function test_PreviewReportsAllowedWhenEverythingPasses() public view {
         (bool allowed, address rejecting, bytes32 reason) = gate.previewCheck(sender, recipient, 100e18);
         assertTrue(allowed);
         assertEq(rejecting, address(0));
@@ -366,5 +366,36 @@ contract ComplianceRulesTest is Test {
         for (uint256 i = 4; i < data.length; ++i) {
             out[i - 4] = data[i];
         }
+    }
+
+    // --- The last two untested branches in the rule layer. Small, but "93.85% branches, two
+    //     named exceptions" is a weaker claim to hand a judge than "100%, no exceptions" — and
+    //     both were quick to actually close rather than leave written off. ---
+
+    function test_RevertWhen_StructuringRuleConstructedWithZeroGate() public {
+        vm.expectRevert(StructuringRule.ZeroAddress.selector);
+        new StructuringRule(address(0), 1 days, 5, 1_000e18);
+    }
+
+    /// activityFor()'s own expired-window branch — distinct from record()'s window-reset logic
+    /// (already covered by test_StructuringWindowResets). This is the read-only view an
+    /// operator or the Auditor UI would call to explain a refusal; it must report a clean slate
+    /// for a window that's aged out, not stale counts from a window that's already forgotten.
+    function test_ActivityFor_ReportsCleanSlateAfterWindowExpires() public {
+        StructuringRule rule = new StructuringRule(address(gate), 1 days, 5, 1_000e18);
+        vm.prank(admin);
+        gate.registerRule(rule);
+
+        vm.prank(sender);
+        escrow.initiate(recipient, 100e18);
+        (, uint256 transfersBefore,) = rule.activityFor(sender, recipient);
+        assertEq(transfersBefore, 1);
+
+        vm.warp(block.timestamp + 1 days + 1);
+
+        (uint64 windowStart, uint256 transfers, uint256 volume) = rule.activityFor(sender, recipient);
+        assertEq(windowStart, 0);
+        assertEq(transfers, 0);
+        assertEq(volume, 0);
     }
 }
