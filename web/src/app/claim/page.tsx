@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { StepHeader, FunnelFooter } from "@/components/funnel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -167,13 +168,10 @@ export default function ClaimPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Claim</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Settle an open escrow with your own wallet — no relayer, no custody. Recipients claim what was sent to them;
-          senders reclaim what was never picked up.
-        </p>
-      </div>
+      <StepHeader
+        title="Claim"
+        claim="Settle an open escrow with your own wallet — no relayer, no custody. Recipients claim what was sent to them; senders reclaim what was never picked up."
+      />
 
       {!wallet.address && (
         <Alert>
@@ -333,6 +331,7 @@ export default function ClaimPage() {
           )}
         </CardContent>
       </Card>
+      <FunnelFooter />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { StepHeader, FunnelFooter } from "@/components/funnel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -237,10 +238,10 @@ export default function SendPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Send</h1>
-        <p className="text-muted-foreground text-sm mt-1">Malaysia &rarr; Philippines corridor. Every payment clears Cleanverse&apos;s real on-chain compliance check.</p>
-      </div>
+      <StepHeader
+        title="Send"
+        claim="Malaysia to Philippines. Watch three compliance layers run before the payment exists — try an unverified recipient to see one refuse."
+      />
 
       {!wallet.address && (
         <Alert>
@@ -388,6 +389,7 @@ export default function SendPage() {
           )}
         </CardContent>
       </Card>
+      <FunnelFooter />
     </div>
   );
 }

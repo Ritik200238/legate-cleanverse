@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { StepHeader, FunnelFooter } from "@/components/funnel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -67,8 +68,10 @@ export default function AuditorPage() {
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       <div className="print:hidden">
-        <h1 className="text-2xl font-semibold tracking-tight">Auditor</h1>
-        <p className="text-muted-foreground text-sm mt-1">Look up any payment: real on-chain state, the real Cleanverse Travel Rule report, and its on-chain hash anchor.</p>
+        <StepHeader
+          title="Verify"
+          claim="Audit any payment — real on-chain state, the real Travel Rule report, and its hash anchor. No wallet needed for this step."
+        />
       </div>
 
       <Card className="print:hidden">
@@ -157,6 +160,7 @@ export default function AuditorPage() {
           </div>
         </>
       )}
+      <FunnelFooter />
     </div>
   );
 }

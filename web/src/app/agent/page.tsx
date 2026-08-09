@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { StepHeader, FunnelFooter } from "@/components/funnel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,10 +155,10 @@ export default function AgentConsolePage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Agent Console</h1>
-        <p className="text-muted-foreground text-sm mt-1">Create and revoke on-chain spend mandates for an AI agent wallet — enforced by AgentMandate.sol, not a promise.</p>
-      </div>
+      <StepHeader
+        title="Agent Console"
+        claim="Give an AI agent a spend mandate held in contract storage. A jailbroken agent hits the same revert an honest one does."
+      />
 
       {!wallet.address && (
         <Alert>
@@ -267,6 +268,7 @@ export default function AgentConsolePage() {
           </div>
         </CardContent>
       </Card>
+      <FunnelFooter />
     </div>
   );
 }
