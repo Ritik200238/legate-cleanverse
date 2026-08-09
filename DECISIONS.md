@@ -371,6 +371,41 @@ Two things worth recording from that pass:
 
 Both were exactly the failure mode `CLAUDE.md` §5 is about — narration drifting from what the system actually did — and neither would have been visible in a written scene description.
 
+## 2026-08-09 — Studying what already won, then auditing ourselves against it
+
+Researched five products with real traction — Safe, Circle/USDC, Aave Horizon, Uniswap v4 Permissioned Pools, Maple — and pulled two transferable lessons from each. Every figure below was verified by live search, not recalled; several post-date the assistant's knowledge cutoff and would otherwise have been fabricated.
+
+**The audit, which was the useful part.** Checking ten borrowed lessons against the actual code found seven already implemented, one partial, and two absent. The seven were not the finding — they were already built. The finding was that **none of them were in the pitch**, and that the one flagged "absent" was the flagship.
+
+| Lesson | Verified state |
+|---|---|
+| Blacklist as protocol primitive, both parties (Circle) | Real — `checkAndRecord` + `isCompliant` |
+| Compliance in the execution layer (Uniswap) | Real |
+| Issuer owns the allowlist, not the protocol (Uniswap) | Real — Legate holds no identity list |
+| Operational honesty over fake instant liquidity (Maple) | Real — the claim window |
+| Accountable operator, not algorithmic trust (Maple) | Real — framed as an apology, now framed as the design |
+| Freeze *with* recourse (Circle's weakness) | **Partial** |
+| Safe-style module/guard extensibility | **Absent** |
+| Public rule-module interface (Safe) | **Absent — built this session** |
+| Asymmetric permissioning (Aave) | Absent — roadmap |
+
+**The flagship gap: `ComplianceGate` was closed.** It enforced Cleanverse's identity check plus Legate's own caps and nothing else, with no way for anyone to add policy without forking. Safe's actual lesson is not "have modules" — it is that Safe secured ~$27B by making the extension point *public* so third parties shipped the policies Safe never wrote. So: `IComplianceRule`, a registry on the gate, and a real module.
+
+Three implementation decisions worth recording:
+- **Two passes over the rules, not one.** Every rule must approve before any rule is told the payment happened. A single pass lets a rule that rejects be preceded by rules that already recorded, so a blocked payment silently consumes a legitimate one's velocity budget. There is a test that fails if this is collapsed.
+- **`MAX_RULES` is a real control.** Every payment iterates the list, so an unbounded array is gas-exhaustion DoS on the whole corridor — an admin, or a compromised admin key, could append rules until `initiate` no longer fits in a block.
+- **`previewCheck` returns instead of reverting.** A preview that reverts cannot say *which* layer refused, and saying why is the entire point.
+
+**The module had to be one the other layers genuinely cannot express, or the extension point is decoration.** `StructuringRule` detects smurfing — one large transfer split into many small ones to stay under a reporting threshold. Cleanverse's `RuleV2` is static and judges parties, not patterns across time. The gate's caps are aggregates: a pair moving 20 × 500 aUSDC never trips a 10,000 per-transaction cap and barely registers against a 1,000,000 daily cap, which is exactly why structuring defeats threshold controls. The test asserts the *evasion* first — the pattern must genuinely sail past both caps — before asserting the rule catches it, because otherwise it proves nothing about why the rule exists. Requiring both a transfer count and an aggregate value is what makes it a detector rather than a rate limiter: many small payments are normal, a large total is normal, only both together have no innocent explanation.
+
+**Fixed a claim rather than the code, deliberately.** The earlier note said Legate's freeze recourse "beats Circle." The obvious fix — auto-returning frozen funds — is wrong: a sanctions hold the sanctioned party can unilaterally reverse is not a hold, it is a bypass. The honest and narrower position now in the pitch: unclaimed payments are sender-recoverable on-chain with no admin (`reclaimExpired`); compliance-frozen payments are not, and get an on-chain reason plus a defined refund path instead. Recourse where recourse is legitimate, no bypass where it isn't.
+
+**Caught a real bug on the way.** The backend's compliance preview only ever consulted Cleanverse's REST layer. It knew nothing about the corridor caps or any operator rule, so a payment could clear the preview and then be refused on-chain — the one thing a preview must never do, since its whole purpose is sparing the user a doomed transaction. It now calls `previewCheck` and reads the gate address off the escrow rather than a separate env var, so it cannot drift from the deployment via stale config. An RPC failure returns "no opinion" rather than "blocked": an outage must not paint every payment red, and the contract re-verifies on submission regardless.
+
+**Two self-inflicted errors, both caught by tooling rather than review.** The compiler rejected the A-Token address written in the previous session — bad EIP-55 checksum, which would have failed at deploy. And `test_RevertWhen_ExceedingMaxRules` passed for the wrong reason on first run: `new CountingRule()` inlined into the call is itself a CREATE, so `vm.expectRevert` bound to that rather than to `registerRule`. Both are logged because "the tests pass" was true in both cases and meant nothing.
+
+**73/73 contract tests, 14/14 backend, all three e2e suites, both typechecks, `next build` — all green after.**
+
 ## Next action (current)
 1. **User action needed** — fund `0xb3E18D617F72121a2cf5e05AAed1dCA07Fbc6d5E` via faucet.monad.xyz (CAPTCHA-gated), then run `DEPLOYER_PRIVATE_KEY=... forge script script/DeployMonadTestnet.s.sol:DeployMonadTestnet --rpc-url https://testnet-rpc.monad.xyz --broadcast` from `contracts/`, then `backend/scripts/register-validator.ts` with the resulting escrow address.
 2. **User action needed** — run `gh auth login` interactively, then the real GitHub repo + commit history can be created.
