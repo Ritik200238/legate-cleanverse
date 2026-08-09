@@ -7,7 +7,7 @@ import { StepHeader, FunnelFooter } from "@/components/funnel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { TravelRuleCard } from "@/components/travel-rule-card";
 import { api, type PaymentResult, ApiError } from "@/lib/api";
 import { fromBaseUnits, shortAddress, formatTimestamp } from "@/lib/format";
 import { activeChain } from "@/lib/contracts";
@@ -102,37 +102,7 @@ export default function AuditorPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Travel Rule compliance proof</CardTitle>
-              <CardDescription>
-                A hash anchor of Cleanverse&apos;s real <code className="font-mono text-xs">download_travel_rule</code> report —
-                never the report or any identity data itself.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm">
-              {payment.travelRuleAnchor ? (
-                <>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Report hash</span><span className="font-mono text-xs">{shortAddress(payment.travelRuleAnchor.reportHash)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Anchored</span><span>{formatTimestamp(payment.travelRuleAnchor.anchoredAt)}</span></div>
-                </>
-              ) : payment.state === "Settled" ? (
-                <div className="print:hidden">
-                  <Alert>
-                    <AlertTitle>Not yet anchored</AlertTitle>
-                    <AlertDescription>
-                      Anchoring pulls Cleanverse&apos;s real compliance report for this settlement and writes its hash
-                      on-chain. This is a server-signed action — <code className="font-mono text-xs">TravelRuleAnchor.anchor()</code>{" "}
-                      is <code className="font-mono text-xs">ANCHOR_ROLE</code>-gated on-chain by design, run by whoever
-                      operates this corridor, not triggered from a public page. Check back after the operator anchors it.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Anchoring is only available once a payment is Settled.</p>
-              )}
-            </CardContent>
-          </Card>
+          <TravelRuleCard payment={payment} explainNotAnchored />
 
           <div className="flex gap-2 print:hidden">
             <Button variant="outline" onClick={() => window.print()}>Export PDF</Button>

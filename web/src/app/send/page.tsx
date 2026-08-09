@@ -15,7 +15,8 @@ import { ComplianceBadge } from "@/components/compliance-badge";
 import { RequestPayment } from "@/components/request-payment";
 import { usePublicClient } from "@/lib/wallet";
 import { useWallet } from "@/lib/wallet-context";
-import { api, type RecipientResult, type QuoteResult, type RampQuoteResult, ApiError } from "@/lib/api";
+import { api, type RecipientResult, type QuoteResult, ApiError } from "@/lib/api";
+import { useRampQuote } from "@/lib/use-ramp-quote";
 import { toBaseUnits, fromBaseUnits, shortAddress } from "@/lib/format";
 import { decodeContractError } from "@/lib/decode-error";
 import { ATOKEN_ABI, LEGATE_ESCROW_ABI, CONTRACTS, activeChain } from "@/lib/contracts";
@@ -61,10 +62,7 @@ function SendPageInner() {
   const [txError, setTxError] = useState<string | null>(null);
   const [settledPaymentId, setSettledPaymentId] = useState<string | null>(null);
 
-  const [rampFiatAmount, setRampFiatAmount] = useState("100");
-  const [rampQuote, setRampQuote] = useState<RampQuoteResult | null>(null);
-  const [rampLoading, setRampLoading] = useState(false);
-  const [rampError, setRampError] = useState<string | null>(null);
+  const ramp = useRampQuote({ fiatCurrency: "MYR", isBuyOrSell: "BUY", amountField: "fiatAmount" });
   const [rampWidgetUrl, setRampWidgetUrl] = useState<string | null>(null);
 
   const [showRequestPayment, setShowRequestPayment] = useState(false);
@@ -237,34 +235,18 @@ function SendPageInner() {
   }
 
   async function handleRampQuote() {
-    setRampLoading(true);
-    setRampError(null);
-    setRampQuote(null);
     setRampWidgetUrl(null);
-    try {
-      const q = await api.getRampQuote({
-        fiatCurrency: "MYR",
-        cryptoCurrency: "USDC",
-        isBuyOrSell: "BUY",
-        paymentMethod: "credit_debit_card",
-        fiatAmount: Number(rampFiatAmount),
-      });
-      setRampQuote(q);
-    } catch (err) {
-      setRampError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      setRampLoading(false);
-    }
+    await ramp.getQuote();
   }
 
   async function handleOpenRampWidget() {
-    if (!rampQuote || !wallet.address) return;
+    if (!ramp.quote || !wallet.address) return;
     try {
-      const widget = await api.createRampWidget({ quoteToken: rampQuote.quoteToken, walletAddress: wallet.address, walletChain: "base" });
+      const widget = await api.createRampWidget({ quoteToken: ramp.quote.quoteToken, walletAddress: wallet.address, walletChain: "base" });
       setRampWidgetUrl(widget.widgetUrl);
       window.open(widget.widgetUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
-      setRampError(err instanceof ApiError ? err.message : String(err));
+      ramp.setError(err instanceof ApiError ? err.message : String(err));
     }
   }
 
@@ -371,17 +353,17 @@ function SendPageInner() {
           <div className="flex gap-2 items-end">
             <div className="flex flex-col gap-1.5 flex-1">
               <Label htmlFor="ramp-amount">MYR amount</Label>
-              <Input id="ramp-amount" type="number" min="0" value={rampFiatAmount} onChange={(e) => setRampFiatAmount(e.target.value)} />
+              <Input id="ramp-amount" type="number" min="0" value={ramp.amount} onChange={(e) => ramp.setAmount(e.target.value)} />
             </div>
-            <Button variant="outline" onClick={handleRampQuote} disabled={rampLoading}>
-              {rampLoading ? "Quoting…" : "Get real quote"}
+            <Button variant="outline" onClick={handleRampQuote} disabled={ramp.loading}>
+              {ramp.loading ? "Quoting…" : "Get real quote"}
             </Button>
           </div>
-          {rampError && <p className="text-sm text-destructive">{rampError}</p>}
-          {rampQuote && (
+          {ramp.error && <p className="text-sm text-destructive">{ramp.error}</p>}
+          {ramp.quote && (
             <div className="text-sm flex flex-col gap-1">
-              <div className="flex justify-between"><span className="text-muted-foreground">You receive</span><span>{rampQuote.cryptoAmount} USDC</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span>{rampQuote.totalFee} MYR</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">You receive</span><span>{ramp.quote.cryptoAmount} USDC</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span>{ramp.quote.totalFee} MYR</span></div>
               <Button size="sm" className="mt-2 self-start" onClick={handleOpenRampWidget} disabled={!wallet.address}>
                 Open Cleanverse Ramp ↗
               </Button>

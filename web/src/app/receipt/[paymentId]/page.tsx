@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { TravelRuleCard } from "@/components/travel-rule-card";
 import { api, type PaymentResult } from "@/lib/api";
 import { fromBaseUnits, shortAddress, formatTimestamp } from "@/lib/format";
 import { activeChain } from "@/lib/contracts";
@@ -83,22 +84,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ paymen
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Travel Rule compliance proof</CardTitle>
-              <CardDescription>A hash anchor of Cleanverse&apos;s real compliance report — never the report or identity data itself.</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm">
-              {payment.travelRuleAnchor ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Report hash</span><span className="font-mono text-xs">{shortAddress(payment.travelRuleAnchor.reportHash)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Anchored</span><span>{formatTimestamp(payment.travelRuleAnchor.anchoredAt)}</span></div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Not yet anchored.</p>
-              )}
-            </CardContent>
-          </Card>
+          <TravelRuleCard payment={payment} />
 
           <div className="text-center">
             <Link href="/auditor" className="text-xs underline text-muted-foreground">

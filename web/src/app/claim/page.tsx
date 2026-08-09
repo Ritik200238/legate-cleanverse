@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePublicClient } from "@/lib/wallet";
 import { useWallet } from "@/lib/wallet-context";
-import { api, type RecipientResult, type PaymentResult, type RampQuoteResult, ApiError } from "@/lib/api";
+import { api, type RecipientResult, type PaymentResult, ApiError } from "@/lib/api";
+import { useRampQuote } from "@/lib/use-ramp-quote";
 import { fromBaseUnits, shortAddress, formatTimestamp } from "@/lib/format";
 import { decodeContractError } from "@/lib/decode-error";
 import { LEGATE_ESCROW_ABI, CONTRACTS, activeChain } from "@/lib/contracts";
@@ -29,10 +30,7 @@ export default function ClaimPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [chainNow, setChainNow] = useState<number | null>(null);
 
-  const [rampFiatAmount, setRampFiatAmount] = useState("100");
-  const [rampQuote, setRampQuote] = useState<RampQuoteResult | null>(null);
-  const [rampLoading, setRampLoading] = useState(false);
-  const [rampError, setRampError] = useState<string | null>(null);
+  const ramp = useRampQuote({ fiatCurrency: "PHP", isBuyOrSell: "SELL", amountField: "cryptoAmount" });
 
   useEffect(() => {
     if (!wallet.address) {
@@ -145,25 +143,6 @@ export default function ClaimPage() {
       setActionError(decodeContractError(err).message);
     } finally {
       setBusy(null);
-    }
-  }
-
-  async function handleRampQuote() {
-    setRampLoading(true);
-    setRampError(null);
-    try {
-      const q = await api.getRampQuote({
-        fiatCurrency: "PHP",
-        cryptoCurrency: "USDC",
-        isBuyOrSell: "SELL",
-        paymentMethod: "credit_debit_card",
-        cryptoAmount: Number(rampFiatAmount),
-      });
-      setRampQuote(q);
-    } catch (err) {
-      setRampError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      setRampLoading(false);
     }
   }
 
@@ -325,17 +304,17 @@ export default function ClaimPage() {
           <div className="flex gap-2 items-end">
             <div className="flex flex-col gap-1.5 flex-1">
               <Label htmlFor="sell-amount">USDC amount</Label>
-              <Input id="sell-amount" type="number" min="0" value={rampFiatAmount} onChange={(e) => setRampFiatAmount(e.target.value)} />
+              <Input id="sell-amount" type="number" min="0" value={ramp.amount} onChange={(e) => ramp.setAmount(e.target.value)} />
             </div>
-            <Button variant="outline" onClick={handleRampQuote} disabled={rampLoading}>
-              {rampLoading ? "Quoting…" : "Get real quote"}
+            <Button variant="outline" onClick={ramp.getQuote} disabled={ramp.loading}>
+              {ramp.loading ? "Quoting…" : "Get real quote"}
             </Button>
           </div>
-          {rampError && <p className="text-sm text-destructive">{rampError}</p>}
-          {rampQuote && (
+          {ramp.error && <p className="text-sm text-destructive">{ramp.error}</p>}
+          {ramp.quote && (
             <div className="text-sm flex flex-col gap-1">
-              <div className="flex justify-between"><span className="text-muted-foreground">You receive</span><span>{rampQuote.fiatAmount} PHP</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span>{rampQuote.totalFee} PHP</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">You receive</span><span>{ramp.quote.fiatAmount} PHP</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span>{ramp.quote.totalFee} PHP</span></div>
             </div>
           )}
         </CardContent>
