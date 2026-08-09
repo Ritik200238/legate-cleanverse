@@ -90,7 +90,7 @@ That walks PRD §6's four scenes against real contracts on a local chain: a sett
 
 ```
 contracts/   Foundry project — 6 contracts (5 rail + 1 pluggable rule
-             module), 2 interfaces, 73 tests (see below)
+             module), 2 interfaces, 88 tests (see below)
 backend/     Node/TypeScript — Cleanverse REST client, policy engine, x402
              middleware, MCP server (6 tools), REST API for the web app
 web/         Next.js 16 — Send, Claim, Agent Console, Auditor, and the
@@ -113,7 +113,7 @@ Six contracts — five that make up the rail, plus one pluggable rule module tha
 
 ```bash
 cd contracts
-forge test           # 73/73 passing, including fuzz tests and a proven reentrancy + mandate-hijack exploit
+forge test           # 88/88 passing, including fuzz tests and a proven reentrancy + mandate-hijack exploit
 forge build
 ```
 

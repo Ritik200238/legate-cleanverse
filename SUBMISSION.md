@@ -55,9 +55,21 @@ Legate ships one such module to prove the extension point is real rather than de
 
 **Privacy:** no personal or KYC data ever touches the chain — hashes and references only.
 
+### The one place we are not deep, stated before you find it
+
+Track 02 asks for CVI as *"a protocol entry condition **or** risk parameter."* Legate does the first thoroughly. It does **not** do graduated risk — tier 30 gets one cap, tier 50 gets a larger one.
+
+That is not an oversight, and it is worth being precise about why. `complianceVerify()` returns a bare boolean. There is no per-user tier readable on-chain anywhere. The only ways to get graduated behaviour today are to have our backend assert each user's tier to the contract — which would make a compromised backend able to raise its own limits, destroying the one property this entire design exists to guarantee — or to fabricate a tier in the UI, which is worse.
+
+So we do what the chain can actually prove: tier gates entry at the corridor's `min_tier: 30` threshold, enforced by Cleanverse's own rule rather than by us.
+
+**The architecturally honest route to graduated limits** is multiple pools, each registered with the validator at a different `min_tier` and carrying its own `ComplianceGate` caps — the tier check stays entirely inside Cleanverse's rule engine, and Legate never asserts anything about anyone's identity. That is a deployment-and-registration change, not a contract change, and it is the next thing after the corridor is live.
+
+We would rather show you a real gap with a real plan than a fake tier.
+
 ## What's verifiable right now
 
-- **73/73 Foundry tests**, including a real reentrancy attack and a real mandate-hijack exploit, both written as working PoCs before their fixes existed, plus 19 covering the rule layer — the ones worth reading prove that a vetoed payment leaves no residue in corridor volume or any rule's state, and that a rule contract the gate was never compiled against still changes what the corridor refuses.
+- **88/88 Foundry tests**, including a real reentrancy attack and a real mandate-hijack exploit, both written as working PoCs before their fixes existed, plus 19 covering the rule layer — the ones worth reading prove that a vetoed payment leaves no residue in corridor volume or any rule's state, and that a rule contract the gate was never compiled against still changes what the corridor refuses.
 - **`bash demo/run-demo.sh`** — all four demo scenes end to end in ~40 seconds, no credentials, no testnet funds. Every refusal it prints is asserted against the exact custom-error selector, so a generic failure fails the run rather than passing as a convincing "BLOCKED".
 - **Real end-to-end harnesses**, not mocks: real contracts on a real chain, a real MCP client driving the server over real stdio, real HTTP against the real backend.
 - **`DECISIONS.md`** — every verified fact with the call that verified it, and every claim that turned out false. Including two places where Cleanverse's published docs disagree with their live sandbox: the phantom Monad ramp support above, and a redeployed Monad A-Token whose decimals moved 6→18, which a live test caught and which would otherwise have shipped a per-transaction cap of 0.00000001 aUSDC.

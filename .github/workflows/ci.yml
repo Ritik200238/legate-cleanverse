@@ -1,0 +1,86 @@
+name: CI
+
+# Runs the parts of the suite that need no credentials and no network beyond package
+# installs. The live Cleanverse tests and the anvil-backed end-to-end scripts are
+# deliberately excluded: they need a real sandbox api-id and would turn a red build into
+# "someone else's outage" rather than "we broke something". They are run locally and their
+# results are recorded in DECISIONS.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  contracts:
+    name: Contracts — build, test, coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # forge-std and OpenZeppelin are pinned submodules
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Build
+        working-directory: contracts
+        run: forge build --sizes
+
+      - name: Test
+        working-directory: contracts
+        run: forge test -vv
+
+      - name: Coverage
+        working-directory: contracts
+        run: forge coverage --no-match-coverage "test|script"
+
+  backend:
+    name: Backend — typecheck and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - working-directory: backend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: backend
+        run: npx tsc --noEmit -p tsconfig.json
+
+      # Only the offline suite. cleanverse-client.live.test.ts hits the real UAT sandbox and
+      # needs a credential that is not in this repo, by design.
+      - name: Unit tests
+        working-directory: backend
+        run: npx vitest run test/crypto.test.ts
+
+  web:
+    name: Web — typecheck, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - working-directory: web
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: web
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: web
+        run: npx next lint || true # advisory: lint findings shouldn't block a green build
+
+      - name: Build
+        working-directory: web
+        run: npx next build
