@@ -14,6 +14,8 @@ In July 2026 Uniswap shipped [Permissioned Pools](https://blog.uniswap.org/intro
 
 Corridor: **Malaysia ↔ Philippines** — live-verified against Cleanverse's real Fiat Ramp (see [`DECISIONS.md`](./DECISIONS.md) for why Singapore↔India, the original target, was dropped after the sandbox proved SGD/INR aren't supported there).
 
+![Legate walkthrough — Home, Send, Claim, Agent Console, Auditor, all on the live deployment](./docs/media/legate-walkthrough.gif)
+
 ---
 
 ## Proof, not claims
