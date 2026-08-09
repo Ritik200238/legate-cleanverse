@@ -35,12 +35,22 @@ function SendPageInner() {
   const publicClient = usePublicClient();
   const searchParams = useSearchParams();
 
-  const [recipientInput, setRecipientInput] = useState("");
+  // A payment-request link (built by <RequestPayment/>) is just Send with search params —
+  // there's no server-side request object to look up, so fulfilling one is exactly opening
+  // this page with `to`/`amount`/`memo` set. Read once via lazy useState initializers, not an
+  // effect: these are the form's real initial values, not state synchronized from an external
+  // system, and searchParams is already a hook result available in this scope. The recipient's
+  // identity still goes through the real A-Pass lookup below either way — the URL supplies an
+  // address to check, never a claim about who's behind it.
+  const [recipientInput, setRecipientInput] = useState(() => {
+    const to = searchParams.get("to");
+    return to && /^0x[0-9a-fA-F]{40}$/.test(to) ? to : "";
+  });
   const [recipient, setRecipient] = useState<RecipientResult | null>(null);
   const [recipientLoading, setRecipientLoading] = useState(false);
   const [recipientError, setRecipientError] = useState<string | null>(null);
 
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState(() => searchParams.get("amount") || "100");
   const [quote, setQuote] = useState<QuoteResult | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -58,25 +68,7 @@ function SendPageInner() {
   const [rampWidgetUrl, setRampWidgetUrl] = useState<string | null>(null);
 
   const [showRequestPayment, setShowRequestPayment] = useState(false);
-  const [requestMemo, setRequestMemo] = useState<string | null>(null);
-
-  // A payment-request link (built by <RequestPayment/>) is just Send with search params —
-  // there's no server-side request object to look up, so fulfilling one is exactly opening
-  // this page with `to`/`amount`/`memo` set. Pre-fills the same fields a manual entry would,
-  // and the recipient's identity still goes through the real A-Pass lookup below — the URL
-  // supplies an address to check, never a claim about who's behind it.
-  useEffect(() => {
-    const to = searchParams.get("to");
-    const requestedAmount = searchParams.get("amount");
-    const memo = searchParams.get("memo");
-    if (to && /^0x[0-9a-fA-F]{40}$/.test(to)) setRecipientInput(to);
-    if (requestedAmount) setAmount(requestedAmount);
-    if (memo) setRequestMemo(memo);
-    // Search params are read once on load, not kept in sync afterward — this pre-fills a
-    // form, it doesn't bind to the URL. Re-running on every params change would fight the
-    // user's own edits once they start adjusting the amount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [requestMemo] = useState(() => searchParams.get("memo"));
 
   const amountBaseUnits = useMemo(() => {
     try {
@@ -89,6 +81,11 @@ function SendPageInner() {
   // Debounced recipient A-Pass lookup — real REST call, not simulated.
   useEffect(() => {
     if (!/^0x[0-9a-fA-F]{40}$/.test(recipientInput)) {
+      // Same class of fix as the catch handler below: clearing stale recipient data the
+      // instant the typed address stops being valid, not a synchronous render-time
+      // derivation. Leaving this stale is the exact bug documented below (Send button
+      // staying enabled against a no-longer-current address).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecipient(null);
       setRecipientError(recipientInput ? "Enter a valid 20-byte address (0x...)" : null);
       return;
@@ -124,6 +121,9 @@ function SendPageInner() {
   // Quote + compliance preview once we have a connected sender, a valid recipient, and an amount.
   useEffect(() => {
     if (!wallet.address || !recipient || amountBaseUnits <= 0n) {
+      // Clearing a quote that no longer corresponds to the current inputs, not deriving
+      // state during render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuote(null);
       setQuoteError(null);
       return;
