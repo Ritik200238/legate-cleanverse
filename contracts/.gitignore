@@ -4,3 +4,6 @@
 cache/
 out/
 broadcast/
+
+# Coverage artifacts
+lcov.info
