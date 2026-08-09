@@ -22,16 +22,30 @@ import {StructuringRule} from "../src/rules/StructuringRule.sol";
 ///         immediately after this script succeeds.
 ///
 /// Usage (from contracts/, with foundry on PATH):
-///   DEPLOYER_PRIVATE_KEY=0x... forge script script/DeployMonadTestnet.s.sol:DeployMonadTestnet \
-///     --rpc-url https://testnet-rpc.monad.xyz --broadcast --verify -vvvv
+///   1. RE-VERIFY the A-Token address first — curl the real query_deposit_atoken_list endpoint
+///      (chain:"monad") and confirm it against what A_TOKEN_DEFAULT below currently says. It
+///      has changed within a single day before; do not skip this.
+///   2. DEPLOYER_PRIVATE_KEY=0x... [A_TOKEN_ADDRESS=0x... if it changed] \
+///        forge script script/DeployMonadTestnet.s.sol:DeployMonadTestnet \
+///        --rpc-url https://testnet-rpc.monad.xyz --broadcast --verify -vvvv
 ///   (the deployer wallet needs real MON for gas — fund via faucet.monad.xyz first)
 contract DeployMonadTestnet is Script {
-    // Real Monad testnet addresses, re-verified live 2026-08-08 (see PRD.md §5.1, DECISIONS.md).
-    // NOTE: this aUSDC address is NOT the one in Cleanverse's published docs — they redeployed
-    // the Monad A-Token, and the docs snapshot is stale. Verified by calling the real
-    // query_deposit_atoken_list({chain:"monad"}) and then confirming symbol()/decimals()
-    // directly against Monad RPC. Do not "correct" this back to the docs' address.
-    address constant A_TOKEN = 0xfA96De5B8F434c26FdFf953303dD66fF80af1026; // aUSDC — the only asset LegateEscrow accepts
+    // ⚠️  DO NOT TRUST THIS DEFAULT. Cleanverse's own API told us two DIFFERENT addresses were
+    //     canonical Monad aUSDC within the same calendar day (2026-08-09): first
+    //     0xfA96De5B...af1026 (18 decimals, confirmed live via query_deposit_atoken_list AND
+    //     independently via direct Monad RPC decimals()/symbol() reads), then — hours later,
+    //     confirmed stable across 3 consecutive calls, and corroborated by verify_apass's
+    //     separate internal registry also only recognizing it — back to
+    //     0xaC0893567D...1f20D (6 decimals, the ORIGINAL pre-"redeploy" address). See
+    //     DECISIONS.md's 2026-08-09 "Cleanverse's own aUSDC address flip-flopped" entry for the
+    //     full evidence trail. Both addresses are real, live, deployed ERC-20 contracts on
+    //     Monad testnet right now — the ambiguity is which one Cleanverse's own backend
+    //     currently treats as canonical, and that has already changed once today.
+    //
+    //     BEFORE RUNNING THIS SCRIPT FOR REAL: call query_deposit_atoken_list({chain:"monad"})
+    //     one more time and pass whatever it currently returns via A_TOKEN_ADDRESS. The default
+    //     below is a last-known-value fallback, not a verified-at-this-moment fact.
+    address constant A_TOKEN_DEFAULT = 0xaC0893567D43C3E7e6e35a72803df05416C1f20D;
     address constant COMPLIANCE_VALIDATOR = 0xaC7e5179C2C7f03f209136886c172eb34F161792; // IAPassComplianceValidator
 
     // Corridor limits, in whole aUSDC. Scaled by the token's REAL decimals at deploy time
@@ -45,7 +59,15 @@ contract DeployMonadTestnet is Script {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
 
-        uint8 decimals = IERC20Metadata(A_TOKEN).decimals();
+        // Override with A_TOKEN_ADDRESS after re-verifying live — see the warning above. This
+        // is deliberately NOT a hardcoded constant: the address itself has proven unstable
+        // within a single day, and a deploy script that silently trusts a stale value here
+        // would point LegateEscrow at a token Cleanverse's own systems may no longer recognize.
+        address aToken = vm.envOr("A_TOKEN_ADDRESS", A_TOKEN_DEFAULT);
+        console.log("Using A_TOKEN:", aToken);
+        console.log("(re-verify this against a fresh query_deposit_atoken_list call if it's been more than a few hours since you read this)");
+
+        uint8 decimals = IERC20Metadata(aToken).decimals();
         uint256 unit = 10 ** decimals;
         uint256 perTxCap = PER_TX_CAP_WHOLE * unit;
         uint256 dailyCorridorCap = DAILY_CORRIDOR_CAP_WHOLE * unit;
@@ -53,7 +75,7 @@ contract DeployMonadTestnet is Script {
 
         vm.startBroadcast(deployerKey);
 
-        LegateEscrow escrow = new LegateEscrow(A_TOKEN, deployer);
+        LegateEscrow escrow = new LegateEscrow(aToken, deployer);
 
         ComplianceGate gate = new ComplianceGate(COMPLIANCE_VALIDATOR, address(escrow), deployer, perTxCap, dailyCorridorCap);
         escrow.setComplianceGate(address(gate));
@@ -94,7 +116,7 @@ contract DeployMonadTestnet is Script {
         vm.stopBroadcast();
 
         console.log("=== Legate deployed to Monad testnet ===");
-        console.log("aToken (real Cleanverse aUSDC):", A_TOKEN);
+        console.log("aToken (real Cleanverse aUSDC):", aToken);
         console.log("perTxCap (base units):", perTxCap);
         console.log("dailyCorridorCap (base units):", dailyCorridorCap);
         console.log("complianceValidator (real Cleanverse):", COMPLIANCE_VALIDATOR);

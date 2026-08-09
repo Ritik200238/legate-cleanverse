@@ -3,12 +3,13 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @notice Test double for the real aUSDC A-Token (0xfA96De5B8F434c26FdFf953303dD66fF80af1026
-///         on Monad testnet, confirmed live — see PRD.md §5.1). A standard ERC-20 for test
-///         purposes: the real A-Token's compliance-hook behavior on transfer is Cleanverse's
-///         internal implementation, not something Legate can replicate exactly in a mock —
-///         Legate's own on-chain complianceVerify() checks (in ComplianceGate) are what
-///         Legate's tests actually exercise, matching the "two independent enforcement
+/// @notice Test double for the real aUSDC A-Token on Monad testnet — see PRD.md §5.1 for which
+///         address that currently is (unsettled as of 2026-08-09; Cleanverse's own API
+///         returned two different addresses within a single day, see DECISIONS.md). A standard
+///         ERC-20 for test purposes: the real A-Token's compliance-hook behavior on transfer is
+///         Cleanverse's internal implementation, not something Legate can replicate exactly in
+///         a mock — Legate's own on-chain complianceVerify() checks (in ComplianceGate) are
+///         what Legate's tests actually exercise, matching the "two independent enforcement
 ///         points" design in PRD.md §5.1.
 contract MockAToken is ERC20 {
     constructor() ERC20("Mock aUSDC", "aUSDC") {}
