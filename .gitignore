@@ -7,6 +7,9 @@
 .DS_Store
 Thumbs.db
 
+# Playwright MCP scratch output (page snapshots/screenshots from browser automation).
+.playwright-mcp/
+
 # Scratch and research artifacts — real working files, but not part of the shipped product.
 chat.json
 _build/
@@ -32,6 +35,7 @@ CLAUDE.md
 SUBMISSION_EMAIL_DRAFT.md
 VIDEO_SHOTLIST.md
 ONEPAGESUMMARY.md
+Legate-One-Page-Summary.pdf
 
 # Private brief for the frontend designer, not project artifacts.
 FDESIGN.md
