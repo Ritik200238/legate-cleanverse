@@ -102,11 +102,26 @@ export function createApiRouter(config: ApiConfig): Router {
       return;
     }
     try {
+      const amt = BigInt(amount);
       const [preview, feeBps] = await Promise.all([
-        previewCompliance(config.cleanverse, { chain: config.chain, pool: config.pool, sender, recipient }),
+        previewCompliance(config.cleanverse, {
+          chain: config.chain,
+          pool: config.pool,
+          sender,
+          recipient,
+          // The quote is the one place a user is told "this will work" before spending gas, so
+          // it has to consult all three enforcement layers — Cleanverse's identity check plus
+          // the corridor caps and any operator rules the chain is actually running. An
+          // identity-only preview here would confidently green-light a payment the contract
+          // then refuses.
+          onChain: {
+            rpcUrl: config.rpcUrl,
+            escrowAddress: config.legateEscrowAddress,
+            amountBaseUnits: amt,
+          },
+        }),
         escrowContract.feeBps() as Promise<bigint>,
       ]);
-      const amt = BigInt(amount);
       const fee = (amt * feeBps) / 10_000n;
       res.json({
         sender,
