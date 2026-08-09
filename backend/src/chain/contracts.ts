@@ -41,6 +41,7 @@ export const LEGATE_ESCROW_ABI = [
   "function getPayment(bytes32 paymentId) external view returns (tuple(address sender, address recipient, uint256 amount, uint8 state, uint64 createdAt, uint64 settledAt, uint64 claimDeadline))",
   "function feeBps() external view returns (uint256)",
   "function aToken() external view returns (address)",
+  "function complianceGate() external view returns (address)",
   "function CLAIM_WINDOW() external view returns (uint64)",
   "event PaymentEscrowed(bytes32 indexed paymentId, address indexed sender, address indexed recipient, uint256 amount)",
   "event PaymentSettled(bytes32 indexed paymentId, uint256 amountToRecipient, uint256 fee)",
@@ -49,6 +50,24 @@ export const LEGATE_ESCROW_ABI = [
   "error ClaimWindowNotExpired(uint64 deadline)",
   "error InvalidState(uint8 expected, uint8 actual)",
 ];
+
+/**
+ * The gate's own preview. This is what makes the backend's compliance preview honest: without
+ * it the preview only knew what Cleanverse's REST layer knows, so a payment could pass the
+ * preview and then be refused on-chain by a corridor cap or an operator rule the backend had
+ * never heard of. previewCheck runs the exact same three layers checkAndRecord runs, as a
+ * view call, and returns rather than reverts so it can name which layer refused.
+ */
+export const COMPLIANCE_GATE_ABI = [
+  "function previewCheck(address sender, address recipient, uint256 amount) external view returns (bool allowed, address rejectingRule, bytes32 reason)",
+  "function perTxCap() external view returns (uint256)",
+  "function dailyCorridorCap() external view returns (uint256)",
+  "function spentToday() external view returns (uint256)",
+  "function rules() external view returns (address[])",
+  "function ruleCount() external view returns (uint256)",
+];
+
+export const COMPLIANCE_RULE_ABI = ["function name() external view returns (string)"];
 
 export const TRAVEL_RULE_ANCHOR_ABI = [
   "function anchor(bytes32 paymentId, bytes32 reportHash, bytes32 settlementTxHash) external",
