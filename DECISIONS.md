@@ -480,6 +480,20 @@ Every prior verification of the web app this build was server-side: curl against
 
 Also worth noting for anyone reading this fresh: `mcp__claude-in-chrome__gif_creator` exists and was never used this session. A GIF isn't a substitute for the demo video `REQ.md` requires and remains the user's own task, but it's an unexplored option for supplementary material if there's time after the core submission is locked in.
 
+## 2026-08-09 — Closed the last real branch-coverage gap: AgentMandate and ComplianceGate to 100%
+
+`LegateEscrow` went from 42% to 94.74% branches earlier this session; `AgentMandate` and `ComplianceGate` were left at 68.75% each at the time, noted but not returned to. Went back for them — the same class of gap, on the two contracts the pitch's own "Safe module/guard" framing centers on, so leaving one half untested while calling the other half's coverage a strength would have been a real inconsistency for a judge to find.
+
+Same method as before: `forge coverage --report lcov`, then a script pulling exactly which `BRDA:` lines had zero hits, rather than guessing which paths might be thin.
+
+**AgentMandate's gaps:** every individual zero-address branch in the constructor (only the all-valid success path had ever been exercised), `createMandate`'s own `agent == address(0)` and `expiry <= block.timestamp` guards (distinct from `execute()`'s separate `MandateHasExpired` check, already covered — these are two different functions refusing for two different reasons, and only one was tested), `suspendByMirror`'s false-return branch for an already-inactive mandate (needed for a batch revocation sweep not to abort on one stale entry), and `setMirror(address(0))`.
+
+**ComplianceGate's gaps:** `registerRule`'s own zero-address guard, and — the more interesting one — `previewCheck`'s four early-return branches were entirely untested as a *function*. `checkAndRecord`'s equivalent refusals get covered indirectly through `LegateEscrow`'s tests, since `initiate()` calls through this gate, but `previewCheck` is a separate function with its own branches and nothing was calling it with a non-compliant party or an over-cap amount.
+
+**A real bug in the new tests themselves, caught on the first run, not shipped:** two new tests tried to hit the daily cap with a single `DAILY_CAP`-sized call — but `DAILY_CAP > PER_TX_CAP`, so that call hits `PerTxCapExceeded` first and never reaches the logic under test. This is the exact trap this same test file's very first test already documents in its own comment; writing new tests didn't make immunity to the trap automatic. Fixed by looping under-cap calls, the established pattern, and both tests re-ran green.
+
+**Result: `AgentMandate` 68.75% → 100%, `ComplianceGate` 68.75% → 100%.** Suite total: 78.46% → 93.85% branches, 88 → 100 tests. Remaining sub-100% branch coverage is `CVIRegistryMirror` (66.67%, 3 total branches — a small contract) and `StructuringRule` (75%) — smaller, lower-priority surfaces, not touched this round given the deadline.
+
 ## Next action (current)
 1. **User action needed** — fund `0xb3E18D617F72121a2cf5e05AAed1dCA07Fbc6d5E` via faucet.monad.xyz (CAPTCHA-gated). **Before running the deploy script, re-verify the A-Token address per the entry immediately above — it has changed within a single day already.** Then run `DEPLOYER_PRIVATE_KEY=... [A_TOKEN_ADDRESS=0x... if it changed] forge script script/DeployMonadTestnet.s.sol:DeployMonadTestnet --rpc-url https://testnet-rpc.monad.xyz --broadcast` from `contracts/`, then `backend/scripts/register-validator.ts` with the resulting escrow address. This also unblocks the Vercel deployment's `DeploymentStatus` banner clearing and the live receipt permalinks.
 2. **User action needed** — record the demo video (explicitly the user's own task, see this session). `demo/run-demo.sh` exists specifically to make this a read-along.
