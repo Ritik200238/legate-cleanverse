@@ -302,4 +302,24 @@ contract AgentMandateTest is Test {
         vm.expectRevert(AgentMandate.ZeroAddress.selector);
         mandateContract.setMirror(address(0));
     }
+
+    /// This file's setUp() never configures a fee address, so every other test in it exercises
+    /// settleFromMandate()'s fee==0 branch only — the agent-payment path's fee-actually-taken
+    /// branch (LegateEscrow.sol's second `if (fee > 0)`, distinct from settle()'s own) had
+    /// literally never run. Same class of bug already found and fixed once on the human Send
+    /// path (a fee computed but the transfer silently skipped, stranding funds); nothing was
+    /// proving the agent path couldn't regress the same way.
+    function test_AgentPayment_FeeIsActuallyCollectedWhenConfigured() public {
+        address feeAddr = makeAddr("agentPathFee");
+        vm.prank(admin);
+        escrow.setFeeConfig(feeAddr, 50); // 0.5%, same rate the human-path tests use
+
+        _createMandate();
+        vm.prank(agent);
+        mandateContract.execute(recipient, PER_TX_CAP); // within cap, unlike the 1_000e18 this test first tried
+
+        uint256 expectedFee = (PER_TX_CAP * 50) / 10_000;
+        assertEq(aToken.balanceOf(feeAddr), expectedFee, "fee must actually be collected on the agent-settlement path");
+        assertEq(aToken.balanceOf(recipient), PER_TX_CAP - expectedFee);
+    }
 }
