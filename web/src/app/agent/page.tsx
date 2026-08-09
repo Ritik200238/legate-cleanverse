@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { usePublicClient } from "@/lib/wallet";
 import { useWallet } from "@/lib/wallet-context";
-import { api, type MandateResult, ApiError } from "@/lib/api";
+import { api, type MandateResult, type RecipientResult, ApiError } from "@/lib/api";
 import { toBaseUnits, fromBaseUnits, shortAddress, formatTimestamp } from "@/lib/format";
 import { decodeContractError } from "@/lib/decode-error";
 import { AGENT_MANDATE_ABI, CONTRACTS, activeChain } from "@/lib/contracts";
@@ -21,6 +21,21 @@ interface ActivityEvent {
   blockNumber: bigint;
   txHash: string;
   data: Record<string, unknown>;
+}
+
+/** Legate's own tier scheme (PRD.md §5.1 — Cleanverse's docs define only the mechanical 0-99
+ *  range, no fixed meaning): 10 = basic-KYC individual, 30 = enhanced-KYC individual (this
+ *  corridor's registered floor), 50 = verified institutional/agent-operator. Tier 30's numbers
+ *  match the fixed defaults this page has always shipped with — and what demo/run-demo.sh's
+ *  Scene 4 narrates — so a tier-30 principal (or no tier data yet) sees no change at all;
+ *  tier 50+ principals, the ones the PRD's own scheme calls out as agent operators, get a
+ *  suggestion sized for that. Below 30 is below the corridor's own floor — createMandate()
+ *  will refuse it on-chain regardless of what caps are entered, so no suggestion is offered. */
+function suggestedCapsForTier(tier: string | undefined): { perTxCap: string; dailyCap: string; totalCap: string } | null {
+  const n = tier ? Number.parseInt(tier, 10) : NaN;
+  if (Number.isNaN(n) || n < 30) return null;
+  if (n >= 50) return { perTxCap: "2000", dailyCap: "10000", totalCap: "25000" };
+  return { perTxCap: "500", dailyCap: "2000", totalCap: "5000" };
 }
 
 export default function AgentConsolePage() {
@@ -35,6 +50,15 @@ export default function AgentConsolePage() {
   const [dailyCap, setDailyCap] = useState("2000");
   const [totalCap, setTotalCap] = useState("5000");
   const [expiryDays, setExpiryDays] = useState("30");
+
+  // Real CVI tier data for the connected (principal) wallet, and whether the cap fields still
+  // hold the tier-derived suggestion or the admin has since typed their own numbers. Tier data
+  // has always been fetched by this backend (queryApass) but never used for anything besides a
+  // display badge on Send — this is the same live data actually driving a real suggestion here,
+  // not an invented number. The suggestion is informational only: createMandate() still takes
+  // whatever the admin submits, and on-chain enforcement is unchanged (see DECISIONS.md).
+  const [principalStatus, setPrincipalStatus] = useState<RecipientResult | null>(null);
+  const [capsAreSuggested, setCapsAreSuggested] = useState(true);
 
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState(false);
@@ -101,6 +125,38 @@ export default function AgentConsolePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentAddress]);
+
+  useEffect(() => {
+    if (!wallet.address) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPrincipalStatus(null);
+      return;
+    }
+    let cancelled = false;
+    api.getRecipient(wallet.address).then((status) => {
+      if (cancelled) return;
+      setPrincipalStatus(status);
+      if (capsAreSuggested) {
+        const suggestion = suggestedCapsForTier(status.tier);
+        if (suggestion) {
+          setPerTxCap(suggestion.perTxCap);
+          setDailyCap(suggestion.dailyCap);
+          setTotalCap(suggestion.totalCap);
+        }
+      }
+    }).catch(() => {
+      if (!cancelled) setPrincipalStatus(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet.address]);
+
+  function editCap(setter: (v: string) => void, value: string) {
+    setCapsAreSuggested(false);
+    setter(value);
+  }
 
   async function handleCreateMandate() {
     const client = wallet.getWalletClient();
@@ -208,18 +264,29 @@ export default function AgentConsolePage() {
           <CardDescription>Your wallet must itself hold a valid, compliant A-Pass — checked on-chain at creation.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
+          {wallet.address && principalStatus?.hasApass && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline">Your CVI tier {principalStatus.tier}</Badge>
+              {capsAreSuggested && suggestedCapsForTier(principalStatus.tier) && (
+                <span>caps below suggested from this — edit any field to set your own</span>
+              )}
+              {capsAreSuggested && !suggestedCapsForTier(principalStatus.tier) && (
+                <span>below tier 30, this corridor&apos;s registered floor — createMandate() will refuse on-chain regardless of caps entered</span>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label>Per-tx cap</Label>
-              <Input type="number" value={perTxCap} onChange={(e) => setPerTxCap(e.target.value)} />
+              <Input type="number" value={perTxCap} onChange={(e) => editCap(setPerTxCap, e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Daily cap</Label>
-              <Input type="number" value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
+              <Input type="number" value={dailyCap} onChange={(e) => editCap(setDailyCap, e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Total cap</Label>
-              <Input type="number" value={totalCap} onChange={(e) => setTotalCap(e.target.value)} />
+              <Input type="number" value={totalCap} onChange={(e) => editCap(setTotalCap, e.target.value)} />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
