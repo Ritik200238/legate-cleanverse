@@ -1,4 +1,4 @@
-import { Contract, type Signer, type Provider } from "ethers";
+import { Contract, type Signer, type Provider, type Interface } from "ethers";
 
 /**
  * Minimal ABIs — only the functions Legate's backend actually calls, not the full contract
@@ -129,5 +129,19 @@ export function mapRevertToRefusalReason(errorName: string | undefined): Refusal
     default:
       // Genuinely unknown/undecodable failure — reported as such, never guessed at.
       return "EXECUTION_FAILED";
+  }
+}
+
+/** Extracts the custom-error name from an ethers.js contract-call revert, if present. Used by
+ *  both the x402 router and the MCP server to decode the same real on-chain refusals. */
+export function decodeRevertReason(err: unknown, iface: Interface): string | undefined {
+  const anyErr = err as { data?: string; error?: { data?: string } };
+  const data = anyErr?.data ?? anyErr?.error?.data;
+  if (!data) return undefined;
+  try {
+    const parsed = iface.parseError(data);
+    return parsed?.name;
+  } catch {
+    return undefined;
   }
 }

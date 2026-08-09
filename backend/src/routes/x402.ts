@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { JsonRpcProvider, Wallet, type Interface } from "ethers";
-import { getAgentMandateContract, mapRevertToRefusalReason } from "../chain/contracts.js";
+import { getAgentMandateContract, mapRevertToRefusalReason, decodeRevertReason } from "../chain/contracts.js";
 
 /**
  * x402 compliance middleware — PRD.md §5.3. Standard x402 flow (HTTP 402 Payment Required),
@@ -119,17 +119,4 @@ export function createX402Router(config: X402Config): Router {
   });
 
   return router;
-}
-
-/** Extracts the custom-error name from an ethers.js contract-call revert, if present. */
-function decodeRevertReason(err: unknown, iface: Interface): string | undefined {
-  const anyErr = err as { data?: string; error?: { data?: string } };
-  const data = anyErr?.data ?? anyErr?.error?.data;
-  if (!data) return undefined;
-  try {
-    const parsed = iface.parseError(data);
-    return parsed?.name;
-  } catch {
-    return undefined;
-  }
 }

@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import type { CleanverseConfig } from "../cleanverse/client.js";
 import { queryApass, validatorVerify, downloadTravelRule, CleanverseApiError } from "../cleanverse/client.js";
 import { previewCompliance } from "../policy-engine/pipeline.js";
-import { getAgentMandateContract, getLegateEscrowContract, mapRevertToRefusalReason } from "../chain/contracts.js";
+import { getAgentMandateContract, getLegateEscrowContract, mapRevertToRefusalReason, decodeRevertReason } from "../chain/contracts.js";
 
 /**
  * Legate MCP server — PRD.md §5.4. Six tools, thin wrappers over the real Cleanverse client
@@ -255,22 +255,6 @@ function textResult(payload: unknown, isError = false) {
     content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
     isError,
   };
-}
-
-/** Same decode logic as src/routes/x402.ts's decodeRevertReason — extracts the real Solidity
- *  custom-error name from an ethers.js contract-call revert via ABI decoding, never a string
- *  guess. Duplicated (not imported) because the x402 router doesn't export it; kept identical
- *  on purpose so both call sites report the same reason for the same on-chain revert. */
-function decodeRevertReason(err: unknown, iface: Interface): string | undefined {
-  const anyErr = err as { data?: string; error?: { data?: string } };
-  const data = anyErr?.data ?? anyErr?.error?.data;
-  if (!data) return undefined;
-  try {
-    const parsed = iface.parseError(data);
-    return parsed?.name;
-  } catch {
-    return undefined;
-  }
 }
 
 // Allow running this file directly as a stdio MCP server for real agent clients (e.g. Claude
