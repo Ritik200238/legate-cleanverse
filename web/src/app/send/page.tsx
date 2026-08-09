@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { StepHeader, FunnelFooter } from "@/components/funnel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ComplianceBadge } from "@/components/compliance-badge";
+import { RequestPayment } from "@/components/request-payment";
 import { usePublicClient } from "@/lib/wallet";
 import { useWallet } from "@/lib/wallet-context";
 import { api, type RecipientResult, type QuoteResult, type RampQuoteResult, ApiError } from "@/lib/api";
@@ -21,8 +23,17 @@ import { ATOKEN_ABI, LEGATE_ESCROW_ABI, CONTRACTS, activeChain } from "@/lib/con
 type SendStep = "idle" | "checking-allowance" | "needs-approval" | "approving" | "ready" | "initiating" | "done";
 
 export default function SendPage() {
+  return (
+    <Suspense fallback={<div className="max-w-2xl text-sm text-muted-foreground">Loading…</div>}>
+      <SendPageInner />
+    </Suspense>
+  );
+}
+
+function SendPageInner() {
   const wallet = useWallet();
   const publicClient = usePublicClient();
+  const searchParams = useSearchParams();
 
   const [recipientInput, setRecipientInput] = useState("");
   const [recipient, setRecipient] = useState<RecipientResult | null>(null);
@@ -45,6 +56,27 @@ export default function SendPage() {
   const [rampLoading, setRampLoading] = useState(false);
   const [rampError, setRampError] = useState<string | null>(null);
   const [rampWidgetUrl, setRampWidgetUrl] = useState<string | null>(null);
+
+  const [showRequestPayment, setShowRequestPayment] = useState(false);
+  const [requestMemo, setRequestMemo] = useState<string | null>(null);
+
+  // A payment-request link (built by <RequestPayment/>) is just Send with search params —
+  // there's no server-side request object to look up, so fulfilling one is exactly opening
+  // this page with `to`/`amount`/`memo` set. Pre-fills the same fields a manual entry would,
+  // and the recipient's identity still goes through the real A-Pass lookup below — the URL
+  // supplies an address to check, never a claim about who's behind it.
+  useEffect(() => {
+    const to = searchParams.get("to");
+    const requestedAmount = searchParams.get("amount");
+    const memo = searchParams.get("memo");
+    if (to && /^0x[0-9a-fA-F]{40}$/.test(to)) setRecipientInput(to);
+    if (requestedAmount) setAmount(requestedAmount);
+    if (memo) setRequestMemo(memo);
+    // Search params are read once on load, not kept in sync afterward — this pre-fills a
+    // form, it doesn't bind to the URL. Re-running on every params change would fight the
+    // user's own edits once they start adjusting the amount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const amountBaseUnits = useMemo(() => {
     try {
@@ -249,6 +281,25 @@ export default function SendPage() {
           <AlertDescription>Connect a wallet to look up a live quote and send a payment.</AlertDescription>
         </Alert>
       )}
+
+      {requestMemo && (
+        <Alert>
+          <AlertTitle>Fulfilling a payment request</AlertTitle>
+          <AlertDescription>
+            &ldquo;{requestMemo}&rdquo; — the recipient below is whoever shared this link. Same compliance checks,
+            same wallet signature either way.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setShowRequestPayment((v) => !v)}
+        className="self-start text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+      >
+        {showRequestPayment ? "Hide" : "Owed money instead? Request a payment →"}
+      </button>
+      {showRequestPayment && <RequestPayment />}
 
       <Card>
         <CardHeader>
