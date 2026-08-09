@@ -8,6 +8,8 @@ Built for **Cleanverse Build: Trusted Assets** — Track 02 (DeFi / Compliant De
 
 In July 2026 Uniswap shipped [Permissioned Pools](https://blog.uniswap.org/introducing-permissioned-pools-on-uniswap-v4), moving compliance into the AMM's execution layer instead of a frontend gate. **Legate is that thesis applied to payments — and it adds the agent.**
 
+**Live app:** https://legate-cleanverse.vercel.app — a four-step walkthrough; the last step needs no wallet.
+
 Corridor: **Malaysia ↔ Philippines** — live-verified against Cleanverse's real Fiat Ramp (see [`DECISIONS.md`](./DECISIONS.md) for why Singapore↔India, the original target, was dropped after the sandbox proved SGD/INR aren't supported there).
 
 ---

@@ -1,7 +1,8 @@
 # Legate — one-page summary
 
 **Cleanverse Build: Trusted Assets · Track 02 (DeFi) · Monad testnet**
-Team: Chancery Labs · Repo: this repository · Demo: `demo/run-demo.sh`
+Team: Chancery Labs · Repo: this repository
+**Live app: https://legate-cleanverse.vercel.app** · Runnable demo: `bash demo/run-demo.sh`
 
 ---
 
