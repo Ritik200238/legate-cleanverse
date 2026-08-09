@@ -4,7 +4,9 @@
 
 Built for **Cleanverse Build: Trusted Assets** — Track 02 (DeFi / Compliant DeFi), on **Monad testnet**.
 
-Every payment on Legate independently clears Cleanverse's real, on-chain `IAPassComplianceValidator` for both parties, moves exclusively in Cleanverse's compliance-gated stablecoin (A-Token / CVA), and carries a hash-anchored Travel Rule proof. Humans use a web app; AI agents use the same rail through **x402** and **MCP**. The rail stays open — every individual payment proves it's clean on its own, on-chain, regardless of what any off-chain service claims.
+`LegateEscrow` is a **permissioned pool registered with Cleanverse's validator under a real `RuleV2`**. CVI is the protocol's entry condition — both counterparties must clear `complianceVerify()` on-chain before the pool accepts or releases anything, and again at settlement. CVA is the only asset it moves. Every payment carries a hash-anchored Travel Rule proof. Humans use a web app; AI agents use the same contracts through **x402** and **MCP**.
+
+In July 2026 Uniswap shipped [Permissioned Pools](https://blog.uniswap.org/introducing-permissioned-pools-on-uniswap-v4), moving compliance into the AMM's execution layer instead of a frontend gate. **Legate is that thesis applied to payments — and it adds the agent.**
 
 Corridor: **Malaysia ↔ Philippines** — live-verified against Cleanverse's real Fiat Ramp (see [`DECISIONS.md`](./DECISIONS.md) for why Singapore↔India, the original target, was dropped after the sandbox proved SGD/INR aren't supported there).
 
@@ -30,11 +32,19 @@ Remove A-Pass (CVI) and counterparties are anonymous — the rail becomes an ord
           the contracts trust blindly
                           ▼
         CONTRACTS ON MONAD  (the actual source of truth)
-        • ComplianceGate    — wraps IAPassComplianceValidator.complianceVerify()
         • LegateEscrow      — payment lifecycle, the only holder/mover of A-Token
-        • AgentMandate      — on-chain spend caps per agent (state lives here)
+        • AgentMandate      — the MODULE: initiates without holding a key,
+                              bounded by caps that live in storage
+        • ComplianceGate    — the GUARD: can only refuse, never initiate
         • CVIRegistryMirror — active revocation monitor (defense-in-depth)
         • TravelRuleAnchor  — hash-anchors Cleanverse's real compliance report
+                          ▼
+        THE GUARD RUNS THREE LAYERS, EACH OWNED BY WHOEVER IS ACCOUNTABLE
+        1. Cleanverse validator   WHO is this?          → Cleanverse owns it
+        2. ComplianceGate caps    HOW MUCH / HOW OFTEN? → Legate owns it
+        3. IComplianceRule[]      the operator's own    → THE OPERATOR owns it
+           └─ StructuringRule: catches smurfing, which neither
+              layer 1 (static) nor layer 2 (aggregate) can see
                           ▼
         AUDIT LAYER
         • Immutable on-chain event log • Walletless /receipt/:id permalinks
@@ -78,7 +88,7 @@ That walks PRD §6's four scenes against real contracts on a local chain: a sett
 ## Repository layout
 
 ```
-contracts/   Foundry project — 5 Solidity contracts, 54 tests (see below)
+contracts/   Foundry project — 6 Solidity contracts + a rule module, 73 tests (see below)
 backend/     Node/TypeScript — Cleanverse REST client, policy engine, x402
              middleware, MCP server (6 tools), REST API for the web app
 web/         Next.js 16 — Send, Claim, Agent Console, Auditor, and the
@@ -90,17 +100,18 @@ DECISIONS.md Running decision log — every verified fact, every bug found
 
 ## Smart contracts
 
-Five contracts, kept separate on purpose — matches Cleanverse's own Factory/Pool separation pattern and lets a judge audit one small, single-responsibility contract at a time.
+Contracts kept separate on purpose — matches Cleanverse's own Factory/Pool separation pattern and lets a judge audit one small, single-responsibility contract at a time.
 
 - **`LegateEscrow`** — the payment lifecycle (`Escrowed → Settled | Frozen | Refunded`). Accepts only the A-Token. Checks-effects-interactions on every state-changing function that moves funds; `ReentrancyGuard` where it matters (proven by a real reentrancy-attack test, not just asserted). If a recipient never claims, `reclaimExpired()` lets the **original sender** take their own funds back after a 30-day on-chain claim window — no admin in the loop, which is the difference between a remittance rail and a place money goes to get stuck.
-- **`ComplianceGate`** — wraps the real Cleanverse validator's `complianceVerify()`, layers Legate's own per-transaction and daily corridor caps on top (things a static `RuleV2` structurally can't express).
-- **`AgentMandate`** — on-chain spend caps for an AI agent, scoped to a principal who must itself hold a valid A-Pass. Cap-exceeded and non-compliant-recipient reverts surface as structured x402 refusal codes.
+- **`ComplianceGate`** — the guard. Three layers, each owned by whoever is accountable for it: Cleanverse's validator answers *who*, this contract answers *how much and how often*, and registered `IComplianceRule` modules answer whatever the operator's own licence demands. Structurally this is Safe's guard — it can only refuse, never initiate.
+- **`IComplianceRule` + `StructuringRule`** — the extension point, and one module proving it isn't decorative. An operator registers their own policy on-chain without forking anything Legate has already audited. `StructuringRule` detects smurfing — one large transfer split into many small ones — which *neither* other layer can express: `RuleV2` is static and judges parties, not patterns over time, and a pair moving 20 × 500 aUSDC never trips a 10,000 per-transaction cap. That gap is exactly why the extension point exists.
+- **`AgentMandate`** — the module. On-chain spend caps for an AI agent, scoped to a principal who must itself hold a valid A-Pass. A module can *initiate* a payment without holding the principal's key; the guard can only *refuse*. An agent needs both halves — this is the split Safe proved at ~$27B across ~130M transactions in Q2 2026. Cap-exceeded and non-compliant-recipient reverts surface as structured x402 refusal codes.
 - **`CVIRegistryMirror`** — active revocation monitor, driven by a real background poller service (`backend/src/poller/`, see below). Defense-in-depth: settlement independently reverts on revocation even without it.
 - **`TravelRuleAnchor`** — the single canonical anchor point for a payment's Travel Rule proof, cross-checked against `LegateEscrow`'s real on-chain state (rejects anchoring a payment that isn't genuinely Settled) rather than trusting the caller's claim.
 
 ```bash
 cd contracts
-forge test           # 54/54 passing, including fuzz tests and a proven reentrancy + mandate-hijack exploit
+forge test           # 73/73 passing, including fuzz tests and a proven reentrancy + mandate-hijack exploit
 forge build
 ```
 
