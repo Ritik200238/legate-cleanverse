@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {ComplianceGate} from "../src/ComplianceGate.sol";
+import {IComplianceRule} from "../src/interfaces/IComplianceRule.sol";
 import {MockValidator} from "./mocks/MockValidator.sol";
 
 contract ComplianceGateTest is Test {
@@ -103,5 +104,72 @@ contract ComplianceGateTest is Test {
 
         assertEq(gate.spentToday(), succeeded * amountPerCall);
         assertLe(gate.spentToday(), DAILY_CAP, "spentToday must never exceed the configured daily cap");
+    }
+
+    // --- Guards: branch coverage sat at 68.75% -- registerRule's own zero-address guard, and
+    //     previewCheck's early-return branches, were never actually exercised. checkAndRecord's
+    //     equivalent refusals are covered indirectly via LegateEscrow's tests (which call
+    //     through this gate), but previewCheck is a separate function with its own branches,
+    //     and nothing was calling it with a non-compliant party or an over-cap amount. ---
+
+    function test_RevertWhen_RegisteringZeroAddressRule() public {
+        vm.prank(admin);
+        vm.expectRevert(ComplianceGate.ZeroAddress.selector);
+        gate.registerRule(IComplianceRule(address(0)));
+    }
+
+    function test_PreviewCheck_ReportsSenderNotCompliant() public {
+        address unverified = makeAddr("unverifiedSender");
+        (bool allowed, address rejectingRule, bytes32 reason) = gate.previewCheck(unverified, recipient, 100e18);
+        assertFalse(allowed);
+        assertEq(rejectingRule, address(0));
+        assertEq(reason, bytes32("SENDER_NOT_COMPLIANT"));
+    }
+
+    function test_PreviewCheck_ReportsRecipientNotCompliant() public {
+        address unverified = makeAddr("unverifiedRecipient");
+        (bool allowed, address rejectingRule, bytes32 reason) = gate.previewCheck(sender, unverified, 100e18);
+        assertFalse(allowed);
+        assertEq(rejectingRule, address(0));
+        assertEq(reason, bytes32("RECIPIENT_NOT_COMPLIANT"));
+    }
+
+    function test_PreviewCheck_ReportsPerTxCapExceeded() public view {
+        (bool allowed,, bytes32 reason) = gate.previewCheck(sender, recipient, PER_TX_CAP + 1);
+        assertFalse(allowed);
+        assertEq(reason, bytes32("PER_TX_CAP_EXCEEDED"));
+    }
+
+    function test_PreviewCheck_ReportsDailyCapExceeded() public {
+        // A single DAILY_CAP-sized call would hit PerTxCapExceeded first (DAILY_CAP >
+        // PER_TX_CAP) and never reach the daily-cap logic under test — same trap this file's
+        // very first test already documents. Spend the cap across multiple under-PER_TX_CAP
+        // calls instead.
+        vm.startPrank(caller);
+        for (uint256 i = 0; i < 10; i++) {
+            gate.checkAndRecord(sender, recipient, PER_TX_CAP);
+        }
+        vm.stopPrank();
+        assertEq(gate.spentToday(), DAILY_CAP);
+
+        (bool allowed,, bytes32 reason) = gate.previewCheck(sender, recipient, 1e18);
+        assertFalse(allowed);
+        assertEq(reason, bytes32("DAILY_CAP_EXCEEDED"));
+    }
+
+    /// previewCheck's daily-cap arithmetic must roll the window the same way checkAndRecord's
+    /// does, or a preview taken the day after a cap was hit would wrongly keep reporting it
+    /// exceeded — a stale preview actively worse than no preview at all.
+    function test_PreviewCheck_DailyCapWindowRollsOverJustLikeCheckAndRecord() public {
+        vm.startPrank(caller);
+        for (uint256 i = 0; i < 10; i++) {
+            gate.checkAndRecord(sender, recipient, PER_TX_CAP);
+        }
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 1 days + 1);
+
+        (bool allowed,,) = gate.previewCheck(sender, recipient, PER_TX_CAP);
+        assertTrue(allowed, "a new day must reset the corridor volume the preview sees");
     }
 }
