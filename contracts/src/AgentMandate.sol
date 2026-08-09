@@ -175,11 +175,15 @@ contract AgentMandate is AccessControl {
         return true;
     }
 
+    /// @notice Grants MONITOR_ROLE to the CVIRegistryMirror instance, letting it call
+    ///         `suspendByMirror` when a principal's A-Pass is reported revoked.
     function setMirror(address mirror) external onlyRole(ADMIN_ROLE) {
         if (mirror == address(0)) revert ZeroAddress();
         _grantRole(MONITOR_ROLE, mirror);
     }
 
+    /// @notice Full mandate state for a given agent — used by the backend/frontend to render
+    ///         caps, spend-to-date, and active status without needing per-field getters.
     function getMandate(address agent) external view returns (Mandate memory) {
         return mandates[agent];
     }

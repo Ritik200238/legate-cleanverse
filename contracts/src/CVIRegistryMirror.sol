@@ -72,10 +72,15 @@ contract CVIRegistryMirror is AccessControl {
         emit ReactivationReported(wallet);
     }
 
+    /// @notice The mirror's own local view of a wallet's revocation status. Reflects the last
+    ///         `reportRevocation`/`reportReactivation` call, not a live read of Cleanverse's
+    ///         validator — see the contract-level comment for why this is deliberately
+    ///         defense-in-depth rather than the source of truth.
     function isRevoked(address wallet) external view returns (bool) {
         return revoked[wallet];
     }
 
+    /// @notice Grants POLLER_ROLE to the off-chain revocation-poller service's signing key.
     function grantPoller(address poller) external onlyRole(ADMIN_ROLE) {
         _grantRole(POLLER_ROLE, poller);
     }

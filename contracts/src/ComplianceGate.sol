@@ -155,6 +155,8 @@ contract ComplianceGate is AccessControl {
         return _rules;
     }
 
+    /// @notice Count of registered rules — cheaper than reading `rules()` when a caller only
+    ///         needs to know whether any operator policy is active, not what it is.
     function ruleCount() external view returns (uint256) {
         return _rules.length;
     }
@@ -191,12 +193,17 @@ contract ComplianceGate is AccessControl {
         return validator.complianceVerify(pool, sender) && validator.complianceVerify(pool, recipient);
     }
 
+    /// @notice Updates the corridor's per-tx and daily caps. Deliberately no floor validation
+    ///         against `spentToday` — see `checkAndRecord`'s comment on why an emergency
+    ///         cap cut must never be blocked by today's already-spent volume.
     function setLimits(uint256 perTxCap_, uint256 dailyCorridorCap_) external onlyRole(ADMIN_ROLE) {
         perTxCap = perTxCap_;
         dailyCorridorCap = dailyCorridorCap_;
         emit LimitsUpdated(perTxCap_, dailyCorridorCap_);
     }
 
+    /// @notice Grants CALLER_ROLE — the role LegateEscrow and AgentMandate hold so they can
+    ///         call `checkAndRecord`. No other address should ever hold this role.
     function grantCaller(address caller) external onlyRole(ADMIN_ROLE) {
         _grantRole(CALLER_ROLE, caller);
     }

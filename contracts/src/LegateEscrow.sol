@@ -271,17 +271,22 @@ contract LegateEscrow is AccessControl, Ownable, ReentrancyGuard {
 
     // --- Admin configuration ---
 
+    /// @notice Points this escrow at the ComplianceGate that gates every initiate/settle call.
     function setComplianceGate(address gate) external onlyRole(ADMIN_ROLE) {
         if (gate == address(0)) revert ZeroAddress();
         complianceGate = ComplianceGate(gate);
         emit ComplianceGateUpdated(gate);
     }
 
+    /// @notice Grants MONITOR_ROLE to the CVIRegistryMirror instance, letting it call
+    ///         `freezeByMirror` when a party's A-Pass is reported revoked.
     function setMirror(address mirror) external onlyRole(ADMIN_ROLE) {
         if (mirror == address(0)) revert ZeroAddress();
         _grantRole(MONITOR_ROLE, mirror);
     }
 
+    /// @notice Grants CALLER_ROLE to the AgentMandate instance, letting it call
+    ///         `settleFromMandate` on behalf of an agent's spend.
     function setMandate(address mandate) external onlyRole(ADMIN_ROLE) {
         if (mandate == address(0)) revert ZeroAddress();
         _grantRole(CALLER_ROLE, mandate);
@@ -316,6 +321,8 @@ contract LegateEscrow is AccessControl, Ownable, ReentrancyGuard {
         emit FeeConfigUpdated(feeAddress_, feeBps_);
     }
 
+    /// @notice Full payment record — used by the backend/frontend (Auditor, receipt permalink)
+    ///         to render state without needing per-field getters.
     function getPayment(bytes32 paymentId) external view returns (Payment memory) {
         return payments[paymentId];
     }

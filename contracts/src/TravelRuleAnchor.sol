@@ -55,10 +55,14 @@ contract TravelRuleAnchor is AccessControl {
         emit ReportAnchored(paymentId, reportHash, settlementTxHash);
     }
 
+    /// @notice The anchored Travel Rule proof for a payment, if any — zero `anchoredAt` means
+    ///         not yet anchored. Used by the Auditor view and the receipt permalink.
     function getAnchor(bytes32 paymentId) external view returns (Anchor memory) {
         return anchors[paymentId];
     }
 
+    /// @notice Grants ANCHOR_ROLE — the backend's dedicated signer holds this, no user ever
+    ///         does. See `anchor()`'s own doc for why this stays server-only by design.
     function grantAnchor(address who) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _grantRole(ANCHOR_ROLE, who);
     }
