@@ -29,6 +29,8 @@ export interface CompliancePreview {
   reason?: string;
   senderStatus?: { tier: string; group: string; status: 1 | 2 };
   recipientStatus?: { tier: string; group: string; status: 1 | 2 };
+  /** Present when an operator rule module vetoed: which module, and its own reason code. */
+  rejectedBy?: { rule: string; code: string };
 }
 
 export interface QuoteResult {
