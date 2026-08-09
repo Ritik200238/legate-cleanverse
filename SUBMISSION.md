@@ -79,10 +79,10 @@ We would rather show you a real gap with a real plan than a fake tier.
 
 **Monad testnet**, single-chain by design — we claim **CVI, CVA, Gated Pools**, and deliberately not Cross-Chain.
 
-> **Status — stated plainly rather than implied.** The deployment is scripted, dry-run-verified against a live fork of Monad testnet, and collapsed to one command (`scripts/go-live.sh`), but is **not yet live**, blocked on two independent things: the deployer wallet is unfunded (Monad's faucet is CAPTCHA-gated) and `CLEANVERSE_API_KEY` — the AES key `/validator/register` requires — has not yet been issued to us. The contracts, the compliance logic, and all four scenes are proven against real bytecode on a real chain today; what remains is those two credentials, the REST registration call, and standing up `backend/` as its own live deployment (code is ready — `backend/vercel.json`, verified serverless-compatible — the deploy itself needs the real contract addresses from step one first).
+> **Status — live.** Deployed to Monad testnet and registered with Cleanverse's real validator on 2026-08-09 (`tx_hash: 0xa3bc05e625a97181f480b02cc63229ee1e87b33df72c60e6b94bd7aa60ad5c42`). `LegateEscrow.complianceVerify()` resolves for real. Backend is live at `https://legate-cleanverse-backend.vercel.app`; web app at `https://legate-cleanverse.vercel.app`.
 >
-> Fill in on deploy: `LegateEscrow` `<addr>` · `ComplianceGate` `<addr>` · `AgentMandate` `<addr>` · `CVIRegistryMirror` `<addr>` · `TravelRuleAnchor` `<addr>`
-> Receipt permalinks (`/receipt/:paymentId`) become live at the same moment — they are walletless and server-rendered specifically because judging is asynchronous.
+> `LegateEscrow` `0x98b1699a03c107293637aacbde194d29023183b5` · `ComplianceGate` `0x0dd48b48cf25223ee99e67621f90e3358f77c179` · `AgentMandate` `0x0a8e88aad1add3120a79c23128de0ab22e65fdc2` · `CVIRegistryMirror` `0x37649ba127ad8a76992adbad4a489414e80ba3c0` · `TravelRuleAnchor` `0x2ada46d8b57322cd9bfd97f318c0460817f830f8` · `StructuringRule` `0x6eec420c616674af3eb5859d375104a864b79028`
+> Receipt permalinks (`/receipt/:paymentId`) are live now — walletless and server-rendered specifically because judging is asynchronous.
 
 **Named, accountable operator.** `ADMIN_ROLE` is a single deployer EOA for this build, migrating to a Safe multisig before any real-money pilot. This is the same shape Maple uses at ~$2.1B TVL — accountable human underwriters rather than the pretence that an algorithm can price trust — and it is stated here rather than discovered later.
 

@@ -161,7 +161,7 @@ State-changing actions (approve, send, claim, create mandate) are always signed 
 
 ## Deployment status
 
-Contracts and the full stack are built and proven against a real local chain and the real Cleanverse UAT sandbox. Real Monad testnet deployment is scripted, dry-run-verified against a live fork, and collapsed to one command (`scripts/go-live.sh`) — pending two independent credentials: deployer wallet funding (faucet is CAPTCHA-gated) and `CLEANVERSE_API_KEY` (not yet issued to us; required by the encrypted `/validator/register` call). The backend is also verified deployable to Vercel (`backend/vercel.json`) once real contract addresses exist. See `DECISIONS.md` for current status.
+**Live on Monad testnet.** `LegateEscrow` at `0x98b1699a03c107293637aacbde194d29023183b5`, registered with Cleanverse's real validator (`tx_hash: 0xa3bc05e625a97181f480b02cc63229ee1e87b33df72c60e6b94bd7aa60ad5c42`) — `complianceVerify()` resolves for real. Backend live at `https://legate-cleanverse-backend.vercel.app`; web app at `https://legate-cleanverse.vercel.app`. Full address set and deploy trail in `DECISIONS.md`.
 
 ## Credits
 
