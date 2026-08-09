@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 import { Wallet } from "ethers";
-import { validatorGrant, validatorRegister, validatorIsPaused, CleanverseApiError } from "../src/cleanverse/client.js";
+import { validatorRegister, validatorIsPaused, CleanverseApiError } from "../src/cleanverse/client.js";
 import type { CleanverseConfig } from "../src/cleanverse/client.js";
 
 /**
  * One-time setup: registers the real, deployed LegateEscrow contract as a Cleanverse
  * validator pool on Monad testnet, then sets the corridor's initial compliance rule — via the
  * real REST API, not a hand-rolled on-chain call (see PRD.md §5.1, DECISIONS.md for why REST
- * is the correct path: Cleanverse's backend executes the on-chain grant/register transaction
- * itself and returns tx_hash; we never construct the raw poolCountryBitmap ourselves).
+ * is the correct path: Cleanverse's backend executes the on-chain register transaction itself
+ * and returns tx_hash; we never construct the raw poolCountryBitmap ourselves).
+ *
+ * Deliberately does NOT call /validator/grant first. That endpoint verifies the owner
+ * signature against a contract's on-chain Ownable.owner() for Factory-mode registration — it
+ * is not the applicable path for a bare Ownable pool contract, confirmed live on Monad
+ * testnet 2026-08-09 (grant returned "Invalid contract owner signature" on this exact
+ * deployer/escrow pair; calling /validator/register directly with the same signature scheme
+ * over chain+contract_address succeeded immediately, real tx_hash, pool live and unpaused).
+ * See DECISIONS.md for the full trail.
  *
  * Prerequisites:
  *   1. LegateEscrow must already be deployed to real Monad testnet
@@ -43,24 +51,7 @@ async function main() {
   console.log(`Escrow (pool to register): ${escrowAddress}`);
   console.log("");
 
-  // --- Step 1: grant registrar permission to the deployer address ---
-  // EIP-191 personal_sign over lowercase chain+address, no separator (verified live 2026-08-08).
-  const grantMessage = `${CHAIN}${wallet.address}`.toLowerCase();
-  const grantSignature = await wallet.signMessage(grantMessage);
-
-  console.log("=== POST /validator/grant ===");
-  try {
-    const grantResult = await validatorGrant(config, CHAIN, wallet.address, grantSignature);
-    console.log("Granted. tx_hash:", grantResult.tx_hash);
-  } catch (err) {
-    if (err instanceof CleanverseApiError) {
-      console.error(`FAILED [${err.code}]: ${err.message}`);
-      console.error("Raw:", JSON.stringify(err.raw, null, 2));
-    }
-    throw err;
-  }
-
-  // --- Step 2: register the pool + set its initial corridor rule, in the same call ---
+  // --- Register the pool + set its initial corridor rule, in the same call ---
   // EIP-191 personal_sign over lowercase chain+contract_address, no separator.
   const registerMessage = `${CHAIN}${escrowAddress}`.toLowerCase();
   const registerSignature = await wallet.signMessage(registerMessage);
