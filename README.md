@@ -161,7 +161,7 @@ State-changing actions (approve, send, claim, create mandate) are always signed 
 
 ## Deployment status
 
-Contracts and the full stack are built and proven against a real local chain and the real Cleanverse UAT sandbox. Real Monad testnet deployment is scripted and ready (`contracts/script/DeployMonadTestnet.s.sol`, `backend/scripts/register-validator.ts`) but pending deployer wallet funding — see `DECISIONS.md` for current status.
+Contracts and the full stack are built and proven against a real local chain and the real Cleanverse UAT sandbox. Real Monad testnet deployment is scripted, dry-run-verified against a live fork, and collapsed to one command (`scripts/go-live.sh`) — pending two independent credentials: deployer wallet funding (faucet is CAPTCHA-gated) and `CLEANVERSE_API_KEY` (not yet issued to us; required by the encrypted `/validator/register` call). The backend is also verified deployable to Vercel (`backend/vercel.json`) once real contract addresses exist. See `DECISIONS.md` for current status.
 
 ## Credits
 
