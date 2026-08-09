@@ -132,4 +132,13 @@ contract CVIRegistryMirrorTest is Test {
         mirror.reportReactivation(principal);
         assertFalse(mirror.isRevoked(principal));
     }
+
+    function test_RevertWhen_ConstructedWithAnyZeroAddress() public {
+        vm.expectRevert(CVIRegistryMirror.ZeroAddress.selector);
+        new CVIRegistryMirror(address(0), address(mandateContract), admin);
+        vm.expectRevert(CVIRegistryMirror.ZeroAddress.selector);
+        new CVIRegistryMirror(address(escrow), address(0), admin);
+        vm.expectRevert(CVIRegistryMirror.ZeroAddress.selector);
+        new CVIRegistryMirror(address(escrow), address(mandateContract), address(0));
+    }
 }
