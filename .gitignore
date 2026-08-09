@@ -1,0 +1,28 @@
+# Never commit real credentials or private keys.
+.env
+.env.local
+.secrets/
+
+# Editor/OS noise.
+.DS_Store
+Thumbs.db
+
+# Scratch and research artifacts — real working files, but not part of the shipped product.
+chat.json
+_build/
+index.html
+assets/
+RESEARCH_DATABASE.md
+
+# Not ours to redistribute: the hackathon organiser's own API reference and rules document.
+# Both are working references for this build, not Legate's content. DECISIONS.md cites the
+# specific endpoints and findings that came out of them.
+CLEANVERSE_API.md
+REQ.md
+
+# Private to the team — the submitted application form, not product material.
+application-form-*.png
+
+# Internal working agreement for how this repo gets built. Kept local by default; there's
+# nothing secret in it, so uncomment the exclusion if you'd rather show the process.
+CLAUDE.md
