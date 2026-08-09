@@ -73,8 +73,8 @@ contract LegateEscrow is AccessControl, Ownable, ReentrancyGuard {
     event PaymentSettled(bytes32 indexed paymentId, uint256 amountToRecipient, uint256 fee);
     event PaymentFrozen(bytes32 indexed paymentId, string reason);
     event PaymentRefunded(bytes32 indexed paymentId);
-    event ComplianceGateUpdated(address complianceGate);
-    event FeeConfigUpdated(address feeAddress, uint256 feeBps);
+    event ComplianceGateUpdated(address indexed complianceGate);
+    event FeeConfigUpdated(address indexed feeAddress, uint256 feeBps);
 
     error NotCompliantAtSettlement();
     error InvalidState(PaymentState expected, PaymentState actual);
@@ -225,6 +225,15 @@ contract LegateEscrow is AccessControl, Ownable, ReentrancyGuard {
     ///         checks pass — mirrors initiate()+settle() as one atomic call for the
     ///         agent-payment path (Scene 4), since agent payments don't sit in escrow
     ///         awaiting a separate claim step the way human remittances do.
+    /// @dev    `sender` looks arbitrary to static analysis (a static-analysis pass will flag
+    ///         `safeTransferFrom` here as arbitrary-send-erc20) but is not, in practice:
+    ///         CALLER_ROLE is granted exclusively to whatever address setMandate() (admin-only)
+    ///         names, i.e. AgentMandate, and that contract's own execute() only ever passes
+    ///         `mandates[msg.sender].principal` — the specific principal that specific calling
+    ///         agent already holds a validly-created mandate for, itself gated on that
+    ///         principal's A-Pass and their own approve() to this contract. Not arbitrary; the
+    ///         trust boundary is cross-contract and the tool can't see it, so it's recorded
+    ///         here instead of silently suppressed.
     function settleFromMandate(address sender, address recipient, uint256 amount)
         external
         onlyRole(CALLER_ROLE)
@@ -292,6 +301,14 @@ contract LegateEscrow is AccessControl, Ownable, ReentrancyGuard {
         aToken.safeTransfer(to, amount);
     }
 
+    /// @dev No zero-address guard on `feeAddress_`, unlike every other admin setter in this
+    ///      contract — deliberately. `address(0)` is the sentinel this contract already treats
+    ///      as "fees disabled" everywhere a fee is computed (see settle()/settleFromMandate()'s
+    ///      `feeAddress != address(0) ? ... : 0`), matching the pre-configuration default state.
+    ///      Rejecting it here would remove the admin's only way to turn fee collection back off
+    ///      after having turned it on. A static-analysis pass will flag this as
+    ///      missing-zero-check; it is a false positive for this specific field, recorded here
+    ///      rather than silently suppressed so the next reader isn't left wondering either.
     function setFeeConfig(address feeAddress_, uint256 feeBps_) external onlyRole(ADMIN_ROLE) {
         if (feeBps_ > MAX_FEE_BPS) revert FeeTooHigh();
         feeAddress = feeAddress_;
