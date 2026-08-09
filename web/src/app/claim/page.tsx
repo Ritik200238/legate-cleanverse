@@ -36,6 +36,11 @@ export default function ClaimPage() {
 
   useEffect(() => {
     if (!wallet.address) {
+      // Clearing derived state when its own dependency (the connected wallet) goes away, not
+      // deriving state from a render value the rule's "you might not need an effect" guidance
+      // is actually about. Removing this is what leaves a *previous* wallet's A-Pass badge
+      // showing after disconnect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMyApass(null);
       return;
     }
@@ -46,6 +51,10 @@ export default function ClaimPage() {
   // the exact value reclaimExpired() compares p.claimDeadline against.
   useEffect(() => {
     if (!payment || payment.state !== "Escrowed") {
+      // Same as above: resetting a value whose only meaning is "the chain's clock as of the
+      // currently-displayed escrowed payment" once that payment is gone, not a synchronous
+      // render-time derivation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChainNow(null);
       return;
     }

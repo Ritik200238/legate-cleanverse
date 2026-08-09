@@ -91,6 +91,11 @@ export default function AgentConsolePage() {
 
   useEffect(() => {
     if (agentAddress) {
+      // These kick off the real fetches this page exists to show; both set a loading flag
+      // synchronously before their own async work, which is the correct way to trigger a
+      // fetch on a changed dependency, not a value that could instead be computed during
+      // render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       refreshMandate(agentAddress);
       loadActivity(agentAddress);
     }
