@@ -30,7 +30,7 @@ contract ComplianceGateTest is Test {
         validator.setCompliant(pool, recipient, true);
     }
 
-    // --- setLimits() underflow fix (real, proven bug found by adversarial review, see
+    // --- setLimits() underflow fix (real, proven bug found during a security review, see
     //     DECISIONS.md): lowering dailyCorridorCap below the volume already spent today must
     //     still produce the typed DailyCorridorCapExceeded error, not a raw arithmetic-panic
     //     revert — otherwise every downstream consumer of this error (the x402 middleware's

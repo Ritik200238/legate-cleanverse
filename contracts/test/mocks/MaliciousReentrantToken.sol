@@ -7,9 +7,8 @@ import {LegateEscrow} from "../../src/LegateEscrow.sol";
 /// @notice Adversarial test double: an ERC20 whose transfer() attempts to re-enter
 ///         LegateEscrow.settle() on the same paymentId mid-transfer. Used ONLY to prove
 ///         (not assert) that ReentrancyGuard + checks-effects-interactions actually stop a
-///         double-settlement, per the global CLAUDE.md's "actively try to falsify" rule —
-///         a passing test suite that never attempted an attack proves nothing about
-///         reentrancy safety. The real A-Token does not behave this way; this exists purely
+///         double-settlement — a passing test suite that never attempted an attack proves
+///         nothing about reentrancy safety. The real A-Token does not behave this way; this exists purely
 ///         to stress-test LegateEscrow's own defenses.
 contract MaliciousReentrantToken is ERC20 {
     LegateEscrow public target;

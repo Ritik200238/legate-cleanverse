@@ -5,7 +5,7 @@
 **Track:** 02 — DeFi (Compliant DeFi)
 **Chain:** Monad testnet (EVM-compatible — sponsor's chain), single-chain by design
 **Build window:** Aug 8 00:00 → Aug 9 23:59 UTC (48 hours) — commit history must fall inside this window
-**Status of this doc:** Hardened pass (2026-08-07) — full consistency check against `REQ.md` (rubric) and `DECISIONS.md` (every verified fact from docs, live sandbox, Telegram, and the CCP Integration Guide PDF). Stale references from earlier drafts removed. Remaining `[RECON]` items are listed explicitly in §8 and nowhere else — if it's not tagged `[RECON]`, treat it as settled.
+**Status of this doc:** Hardened pass (2026-08-07) — full consistency check against `DECISIONS.md` (every verified fact from docs, live sandbox, Telegram, and the CCP Integration Guide PDF). Stale references from earlier drafts removed. Remaining `[RECON]` items are listed explicitly in §8 and nowhere else — if it's not tagged `[RECON]`, treat it as settled.
 
 ---
 
@@ -28,7 +28,7 @@
 
 ---
 
-## 2. Problem Definition (rubric: Concept, 20 pts)
+## 2. Problem Definition
 
 ### Problem A — the human corridor ($150B)
 Cross-border remittance (Malaysia → Philippines: one of the world's largest and most iconic corridors — Overseas Filipino Worker remittances alone move ~$38B/year) runs on SWIFT-era rails — 3–5 days, and a real fee ([World Bank RPW](https://remittanceprices.worldbank.org/): global average 6.36% of amount sent), compliance handled by fax-era intermediaries. Stablecoins fix speed and cost but fail compliance: no verified counterparties, no Travel Rule data, no auditability. No licensed institution can touch that.
@@ -80,24 +80,24 @@ One rail, two front doors:
 
 **Core design principle (from Pattern 1, Aave Arc vs Horizon):** compliance lives in the **asset and the on-chain validator**, not in an off-chain gatekeeper. The rail stays open; every *payment* must independently clear a real on-chain check.
 
-**Privacy design (the trap most teams fall into):** REQ.md mandates local-only PII. Naive Travel Rule = PII on a public chain = violating the sponsor's core principle, on stage, in the demo. Cleanverse already keeps this off-chain: Travel Rule data is sourced from A-Pass registration (`identityDataList`), and the compliance report is a downloadable PDF from `download_travel_rule`, keyed by transaction hash — never a payload Legate constructs or pushes on-chain. Legate anchors only a **hash commitment** of that report reference (txHash + downloadUrl + fileName) via `TravelRuleAnchor.sol`. On-chain: proof a real compliance report exists for this payment. Off-chain: the report itself, fetched from Cleanverse by authorized parties.
+**Privacy design (the trap most teams fall into):** Raw personal data must never touch a public chain. Naive Travel Rule = PII on a public chain = violating the sponsor's core principle, on stage, in the demo. Cleanverse already keeps this off-chain: Travel Rule data is sourced from A-Pass registration (`identityDataList`), and the compliance report is a downloadable PDF from `download_travel_rule`, keyed by transaction hash — never a payload Legate constructs or pushes on-chain. Legate anchors only a **hash commitment** of that report reference (txHash + downloadUrl + fileName) via `TravelRuleAnchor.sol`. On-chain: proof a real compliance report exists for this payment. Off-chain: the report itself, fetched from Cleanverse by authorized parties.
 
 ---
 
-## 4. Cleanverse Capability Integration Map (rubric: Depth, 30 pts)
+## 4. Cleanverse Capability Integration Map
 
-| # | Capability | Depth | How it's used (verified against docs.cleanverse.com v5.6 + live sandbox + CCP Integration Guide PDF) | REQ.md checklist answer |
+| # | Capability | Depth | How it's used (verified against docs.cleanverse.com v5.6 + live sandbox + CCP Integration Guide PDF) | Coverage |
 |---|-----------|-------|---------------|------------------------|
 | 1 | **CVI (A-Pass)** | 🟢 DEEP | Core condition: both sender AND recipient must hold valid A-Pass, checked on-chain at 4 distinct enforcement moments (escrow-initiate, mandate-creation, mandate-execute ×2, settlement) — 6 `complianceVerify()` call sites total, not a single gate-once check. Real tier/subTier (0–99) + group/subGroup fields (`POST /query_apass`) are genuinely used — Legate's registered `RuleV2` sets a static tier floor at pool-registration time (§5.1), and, distinctly, a connected principal's real live tier now drives graduated spend-cap *suggestions* in the Agent Console (tier 30 = this corridor's floor; tier 50+ = verified institutional/agent-operator gets higher suggested caps) — honestly scoped as off-chain UX, not on-chain enforcement, since Cleanverse's interface exposes no trustless per-user on-chain tier read (only a pool's own registered floor via `getRulesV2`). Revocation (`POST /update_status`) → confirmed no push webhook exists → `CVIRegistryMirror` polls and freezes escrow/mandates within one poll interval, *and* independently, any settlement attempt after revocation reverts on-chain regardless of the poller (defense-in-depth, §5.1). | Core condition ✓ (4 enforcement moments, not 1), level-dependent behavior ✓ (off-chain, real, honestly scoped), revocation affects positions ✓ |
 | 2 | **CVA (A-Token)** | 🟢 DEEP | The ONLY settlement asset (`LegateEscrow` accepts nothing else). Transfer rules are a real on-chain `RuleV2` struct (allowedGroup, allowedSubGroup, minTier, minSubTier, poolCountryBitmap) registered against `IAPassComplianceValidator`, enforced on every transfer by the A-Token's own transfer hook — confirmed on-chain, not API-side gating. Provenance shown per payment via `query_txs`. | All 3 boxes: only asset ✓, enforced per-transfer ✓, provenance visible ✓ |
 | 3 | **CCP** | 🟢 DEEP — on-chain, not just REST | "CCP" is Cleanverse's public capability name; the real substance is `IAPassComplianceValidator` at `0xaC7e5179C2C7f03f209136886c172eb34F161792`, a deployed contract with `complianceVerify(pool, address) → bool`, callable synchronously, no permission required, no off-chain bridge needed. Plus `POST /download_travel_rule` (txHash → official compliance PDF), hash-anchored on-chain post-settlement. Deeper than the REST-only design this replaced, not shallower. | All 3 boxes ✓ |
 | 4 | **Playground** | 🟡 REAL, DIFFERENT PURPOSE | Confirmed via Telegram: exists, but is a learning/reference platform about CVI/CVA/CCP — not a rule-design tool. Legate's `RuleV2` is configured directly against the validator contract, not "designed in Playground." Cited honestly in the README as a resource used to build understanding; no demo footage claimed, because there's nothing to film. | Partial, honestly framed |
-| 5 | **API/SDK** | 🟢 DEEP (no SDK exists) | No SDK anywhere in the docs — every example is raw cURL/JSON. Legate ships its own typed TypeScript client, scoped to exactly the 6 endpoints the four demo scenes touch (§5.2) — not a padded 40-endpoint wrapper that scores no extra points. AES-encrypted request bodies handled correctly where the docs require it (A-Pass/A-Token mutation endpoints). | All 3 boxes ✓ — genuine technical integration, self-built |
+| 5 | **API/SDK** | 🟢 DEEP (no SDK exists) | No SDK anywhere in the docs — every example is raw cURL/JSON. Legate ships its own typed TypeScript client, scoped to exactly the 6 endpoints the four demo scenes touch (§5.2) — not a padded 40-endpoint wrapper covering calls the product never makes. AES-encrypted request bodies handled correctly where the docs require it (A-Pass/A-Token mutation endpoints). | All 3 boxes ✓ — genuine technical integration, self-built |
 | 6 | **Gateway** | 🟢 DEEP, one honestly-scoped gap | Confirmed via Telegram: hackathon accounts get **Issue Member** role automatically — the real Fiat Ramp module (7 endpoints, Transak-powered) is genuinely usable. Both legs wired for real: sender's fiat-in via `create_ramp_widget_url` on the Send view, recipient's fiat-out via the same on Claim. **Live-verified 2026-08-08:** `query_ramp_countries`/`query_ramp_fiat_currencies` confirm MYR and PHP are both supported with `isSellAllowed:true` (full bidirectional) — SGD/INR are confirmed absent from the ramp entirely, which is why the corridor moved to Malaysia↔Philippines (§2). **Second live finding, same day:** despite docs prose listing `monad` as a supported ramp settlement network, `query_ramp_crypto_currencies` returns zero Monad-network assets and `query_ramp_quote` fails for every currency/amount/direction tried against `network:"monad"`, while the identical request against `network:"base"` succeeds immediately with a real quote. The ramp legs settle in USDC on a supported chain (verified: `base`), not directly as aUSDC on Monad — see the corrected Send/Claim spec in §5.5 and the full finding in `DECISIONS.md`. | All 3 boxes ✓ (with the settlement-chain caveat stated honestly, not hidden) |
 | 7 | **Clean Payment Rails** | 🟢 DEEP | Escrow settlement is the core mechanism, built on standard A-Token transfers (AccessCore's ABI isn't published and isn't needed — it's Cleanverse's own deposit-side contract). Clean-money routing via CVA provenance. Merchant/payroll acceptance is Demo Scene 4. A small settlement fee (§5.1) gives this a real revenue mechanism, not just a narrative one. | All 3 boxes ✓ |
 | 8 | **Agent Skill Framework** | 🟢 DEEP (built by Legate — confirmed, not a fallback) | Zero mentions of "agent," "mandate," or "spend control" anywhere in the API docs — confirmed absent, not hoped-against. `AgentMandate.sol` is the only plan: principal verification (A-Pass-bound), counterparty validation (real pre-tx checks on every payout), on-chain spend controls (real contract state, not an off-chain promise), immutable audit trail. | All 4 boxes ✓ |
 
-**Score claim: 7 deep + 1 honestly-partial.** Two of the "deep" rows (API/SDK, Agent Skill Framework) are deep specifically *because* Legate builds real infrastructure Cleanverse doesn't provide. No claim in this table lacks a verified endpoint, address, or interface behind it.
+**Summary: 7 deep integrations, 1 honestly-partial.** Two of the "deep" rows (API/SDK, Agent Skill Framework) are deep specifically *because* Legate builds real infrastructure Cleanverse doesn't provide. No claim in this table lacks a verified endpoint, address, or interface behind it.
 
 ---
 
@@ -105,7 +105,7 @@ One rail, two front doors:
 
 ### 5.1 Smart Contracts (Solidity ^0.8.24, Foundry, deployed to Monad testnet)
 
-**Five contracts, kept separate on purpose.** Separation of concerns is the correct architecture independent of build-window length — it matches REQ.md's own "proper architecture, no hacks" criterion, mirrors Cleanverse's own Factory/Pool separation pattern from their integration guide, and is easier for a judge to audit one small, single-responsibility contract at a time than one contract doing everything.
+**Five contracts, kept separate on purpose.** Separation of concerns is the correct architecture independent of build-window length — it mirrors Cleanverse's own Factory/Pool separation pattern from their integration guide, and it's easier to audit one small, single-responsibility contract at a time than one contract doing everything.
 
 **Data model** (concrete, not hand-waved):
 ```solidity
@@ -137,10 +137,10 @@ struct Mandate {
 mapping(address => Mandate) public mandates; // keyed by agent address
 ```
 
-**Security & access control (production-grade thinking, per REQ.md's Build Quality criterion):**
+**Security & access control (production-grade thinking):**
 - `LegateEscrow.settle()`, `.refundFrozen()`, and `.reclaimExpired()` all follow checks-effects-interactions: `Payment.state` is updated to `Settled`/`Refunded` *before* the external A-Token transfer call, and all three use OpenZeppelin's `ReentrancyGuard`. A-Token transfers can trigger the validator's `complianceVerify()` mid-call; state must already be final before that happens.
 - Roles, via OpenZeppelin `AccessControl`: `ADMIN_ROLE` (register the pool, set `RuleV2`, set the fee address — deployer wallet), `MONITOR_ROLE` (the on-chain identity of `CVIRegistryMirror`'s off-chain poller, the only caller of `freeze()` besides `ADMIN_ROLE`). `complianceVerify()` and all `query*` functions are public views — no role needed, by design, since they're read-only.
-- **Honest disclosure, not hidden:** for the hackathon build, `ADMIN_ROLE` is a single EOA (the deployer). That's a centralization point, and it's stated here rather than glossed over. Production roadmap (§11): migrate `ADMIN_ROLE` to a Safe multisig before any real-money pilot — this is exactly the kind of thing a judge evaluating "technically feasible beyond the hackathon" wants to see acknowledged, not pretended away.
+- **Honest disclosure, not hidden:** for the hackathon build, `ADMIN_ROLE` is a single EOA (the deployer). That's a centralization point, and it's stated here rather than glossed over. Production roadmap (§11): migrate `ADMIN_ROLE` to a Safe multisig before any real-money pilot — a known gap worth naming now rather than discovering later.
 - `AgentMandate.execute()` reverts with typed errors (`CapExceeded`, `MandateExpired`, `MandateRevoked`, `RecipientNotCompliant`) — every revert reason is machine-parseable, feeding the x402 structured-refusal codes (§5.3) directly.
 
 **Contract-by-contract:**
@@ -192,7 +192,7 @@ mapping(address => Mandate) public mandates; // keyed by agent address
 
 **Decision log:** every ALLOW/DENY preview with the rule that fired → append-only store → feeds audit reports. Denials are first-class records.
 
-**Audit report generator:** given any paymentId → the real JSON record (parties as A-Pass refs, not PII; checks run; the real Cleanverse Travel Rule report + anchor proof; chain tx hashes; final state), exportable via the browser's own print-to-PDF (a real, working PDF export — not a server-rendered report template, which this build does not claim to have; corrected here after an adversarial review caught the two wordings drifting apart, see DECISIONS.md).
+**Audit report generator:** given any paymentId → the real JSON record (parties as A-Pass refs, not PII; checks run; the real Cleanverse Travel Rule report + anchor proof; chain tx hashes; final state), exportable via the browser's own print-to-PDF (a real, working PDF export — not a server-rendered report template, which this build does not claim to have; corrected here after a later consistency pass caught the two wordings drifting apart, see DECISIONS.md).
 
 ### 5.3 x402 Compliance Middleware
 
@@ -223,7 +223,7 @@ Four views plus one lightweight page:
 1. **Send** — recipient lookup (A-Pass badge + tier), amount, live quote, compliance preview ("2/2 checks passed"), **real fiat-in via `create_ramp_widget_url`** showing the genuine MYR → USDC leg on a real Cleanverse-supported settlement chain (live-verified: `base` — see the Monad-ramp finding below), send → escrow → settled timeline, provenance panel reading from `query_txs`.
 2. **Claim** — both sides of an open escrow, because both sides have a legitimate claim on it. A recipient verifies their A-Pass → claims from escrow → cashes out via `create_ramp_widget_url` for the real USDC → PHP leg on the same verified chain. A *sender* whose payment was never picked up scans the chain for their own outgoing payments and calls `reclaimExpired()` once the on-chain claim window closes — the page reads the deadline from the chain's own latest block timestamp, not the browser clock, since that's the exact value the contract compares against.
 
-**Fiat Ramp / Monad settlement gap, stated precisely (live-verified 2026-08-08, full detail in `DECISIONS.md`):** Cleanverse's Fiat Ramp docs list `monad` as a supported ramp network, but live testing of `query_ramp_crypto_currencies` and `query_ramp_quote` proves the sandbox does not actually route ramp settlement onto Monad today — every network/currency/amount combination tried against `network:"monad"` fails, while the identical request against `network:"base"` succeeds with a real quote. The Send/Claim views therefore call the real Gateway API end-to-end (quote → widget URL) against a verified-working chain to demonstrate genuine Fiat Ramp integration — that is the real capability being scored. The demo wallets' actual Monad-side aUSDC balance (what `LegateEscrow` escrows and settles) comes from Cleanverse's own sandbox `/faucet` endpoint, since automatically bridging ramp-delivered USDC from another chain onto Monad as aUSDC is a separate cross-chain step Cleanverse doesn't expose and this build does not attempt to fake. This is disclosed on-screen during the demo, not glossed over.
+**Fiat Ramp / Monad settlement gap, stated precisely (live-verified 2026-08-08, full detail in `DECISIONS.md`):** Cleanverse's Fiat Ramp docs list `monad` as a supported ramp network, but live testing of `query_ramp_crypto_currencies` and `query_ramp_quote` proves the sandbox does not actually route ramp settlement onto Monad today — every network/currency/amount combination tried against `network:"monad"` fails, while the identical request against `network:"base"` succeeds with a real quote. The Send/Claim views therefore call the real Gateway API end-to-end (quote → widget URL) against a verified-working chain to demonstrate genuine Fiat Ramp integration — that is the real capability being exercised. The demo wallets' actual Monad-side aUSDC balance (what `LegateEscrow` escrows and settles) comes from Cleanverse's own sandbox `/faucet` endpoint, since automatically bridging ramp-delivered USDC from another chain onto Monad as aUSDC is a separate cross-chain step Cleanverse doesn't expose and this build does not attempt to fake. This is disclosed on-screen during the demo, not glossed over.
 3. **Agent Console** — principal creates/revokes mandates, sets caps, sees agent activity feed with ALLOW/DENY log.
 4. **Auditor** — search any payment → full compliance report; export PDF. Frozen state visible in red for Scene 3.
 5. **`/receipt/:paymentId`** — walletless permalink. Judging is asynchronous (Aug 10–14 per the onboarding email) — a judge won't connect a wallet or navigate a live app. One shareable, read-only URL per payment: checks run, on-chain tx, the real Travel Rule report, anchor proof. Linked from the one-page summary, the README, and Scene 4's audit report.
@@ -249,7 +249,7 @@ Verified sender (MY, real A-Pass, tier 30+) → verified recipient (PH, real A-P
 Two halves, same block range. Half A (real UX): sender attempts payment to an unverified wallet; the backend's `complianceVerify()` preview fails; nothing is submitted to chain — good UX, no wasted gas, this is how the product behaves for real users. Half B (evidence): one deliberate on-chain attempt anyway — the A-Token's own transfer hook reverts it for real, visible on the Monad block explorer, Cleanverse's contract refusing, not Legate's word for it — shown beside a **positive control**: the identical transfer to a verified recipient succeeding nearby. Caption: "Compliance isn't a revert reason — it's a precondition. And when we show you a refusal, it's Cleanverse's contract refusing, not ours."
 
 **Scene 3 — Revocation with teeth.**
-A payment sits in escrow. Sender's A-Pass is revoked (sanctions hit, via `update_status`). `CVIRegistryMirror`'s poller fires → escrow freezes on-chain, live on screen — and independently, if anyone tried to settle it anyway, the on-chain `complianceVerify()` re-check would revert it regardless. Auditor view shows frozen state, reason, refund-to-origin path. Caption: "Revocation doesn't just stop future transactions. It reaches funds already in flight." (Answers REQ.md's hardest CVI checkbox verbatim.)
+A payment sits in escrow. Sender's A-Pass is revoked (sanctions hit, via `update_status`). `CVIRegistryMirror`'s poller fires → escrow freezes on-chain, live on screen — and independently, if anyone tried to settle it anyway, the on-chain `complianceVerify()` re-check would revert it regardless. Auditor view shows frozen state, reason, refund-to-origin path. Caption: "Revocation doesn't just stop future transactions. It reaches funds already in flight."
 
 **Scene 4 — The agent payroll run.**
 Claude, connected via MCP, told in plain English: "Run this week's payroll — 7 contractors." 5 payments clear (A-Pass ✓, mandate caps ✓, on-chain compliance ✓, receipts). #6 exceeds the daily mandate cap → refused by `AgentMandate` on-chain. #7's recipient isn't compliant → refused by the validator. Agent reports back gracefully. One click → auditor report showing all 7 decisions, immutable, each linked to a `/receipt/:id` permalink. Caption: "The first payment rail an AI agent can compliantly use. The compliance is in the rail — not the model."
@@ -260,18 +260,21 @@ Claude, connected via MCP, told in plain English: "Run this week's payroll — 7
 
 ---
 
-## 7. Rubric Mapping — Where Every Point Comes From
+## 7. Where the Depth Actually Is
 
-| Criterion | Pts | Legate's answer | Target |
-|---|---|---|---|
-| CVI·CVA depth | 30 | 7 deep integrations backed by a real on-chain validator contract, not REST assumptions; revocation reaches in-flight funds with two independent enforcement points; CVA the sole asset with real on-chain `RuleV2` enforcement; Travel Rule via the real report + privacy-correct anchoring | 27–29 |
-| Build quality | 25 | Foundry tests on all 5 contracts (revocation, cap-boundary, reentrancy cases), explicit data model, stated access-control roles with an honest note on the hackathon's single-admin-key tradeoff, typed client over exactly the endpoints used, clean monorepo | 22–24 |
-| Concept | 20 | Two convergent problems ($150B remittance + agent payments), named users, pilot-ready with institutions AND merchants, MAS-corridor demo | 18–19 |
-| UX & Demo | 15 | 4-scene recorded video (not a live performance — see §6), institutional UI, walletless receipt permalinks for async judging | 13–14 |
-| Scalability | 10 | §11's phased roadmap with named team roles, a real fee mechanism already live in the MVP (§5.1) not a narrative claim, and every REQ.md bonus signal explicitly mapped to a concrete answer, not just gestured at | 8–9 |
-| **Total** | 100 | | **88–95** |
+A straight accounting of what's built versus what's still open, by area:
 
-**Bonus signals — each with a concrete anchor, not a checkbox:** meaningful primitives (§1, §4) ✓ · real financial infra (§2) ✓ · institution/merchant *architecturally* pilotable — outreach itself not yet done, honestly deprioritized below shipping, see §8/§11 — partial, not ✓ · trust/compliance/interop (§3, §11 Phase 3) ✓ · clear user value, named not abstract (§2) ✓ · feasible beyond hackathon, with a real team plan (§11) ✓ · Monad deploy pending real deployer wallet funding, see DECISIONS.md — partial, not ✓ · Playground engaged with honestly, not overclaimed (§4) ✓.
+**CVI/CVA depth.** 7 deep integrations backed by a real on-chain validator contract, not REST assumptions; revocation reaches in-flight funds with two independent enforcement points; CVA is the sole asset with real on-chain `RuleV2` enforcement; Travel Rule compliance runs through the real report plus privacy-correct anchoring.
+
+**Build quality.** Foundry tests on all 5 contracts (revocation, cap-boundary, reentrancy cases), an explicit data model, stated access-control roles with an honest note on the hackathon's single-admin-key tradeoff, a typed client scoped to exactly the endpoints in use, and a clean monorepo.
+
+**Concept.** Two convergent problems — the $150B remittance corridor and the emerging agent-payment corridor — with named users, architecture that's pilot-ready for both institutions and merchants, and a demo built against a real MAS-regulated corridor.
+
+**UX & demo.** A 4-scene recorded video (not a live performance — see §6), an institutional UI rather than memecoin styling, and walletless receipt permalinks built specifically for asynchronous review.
+
+**Path forward.** §11's phased roadmap with named team roles, and a real fee mechanism already live in the MVP (§5.1) — not a narrative claim.
+
+**Stated plainly, what's still open:** institution/merchant pilots are architecturally ready but outreach itself hasn't happened yet — deprioritized below shipping, see §8/§11. Monad deployment is pending real deployer wallet funding, see `DECISIONS.md`. Everything else above is real and verifiable against §1–§6, not aspirational.
 
 ---
 
@@ -307,7 +310,7 @@ Claude, connected via MCP, told in plain English: "Run this week's payroll — 7
 
 ## 9. 48-Hour Build Schedule (Aug 8 00:00 → Aug 9 23:59 UTC)
 
-Solo build + Claude Code. Sequenced so the demo-critical path completes by hour 36. Assumes `REGISTER_ROLE` and `registerV2`/`registerApass` were already verified for real during recon (§8's top priority) — building against the real validator from hour 0, not a mock. If that verification genuinely didn't clear in time, `ComplianceGate` falls back to a toggleable mock `complianceVerify`, swapped for the real address the moment approval lands — a documented contingency, not the plan.
+Solo build. Sequenced so the demo-critical path completes by hour 36. Assumes `REGISTER_ROLE` and `registerV2`/`registerApass` were already verified for real during recon (§8's top priority) — building against the real validator from hour 0, not a mock. If that verification genuinely didn't clear in time, `ComplianceGate` falls back to a toggleable mock `complianceVerify`, swapped for the real address the moment approval lands — a documented contingency, not the plan.
 
 **Hours 0–6 — Foundations**
 - Monorepo scaffold (contracts / backend / web / mcp)
@@ -360,9 +363,9 @@ Solo build + Claude Code. Sequenced so the demo-critical path completes by hour 
 
 ---
 
-## 11. Beyond the Hackathon (rubric: Scalability, 10 pts — and every bonus signal in REQ.md's checklist)
+## 11. Beyond the Hackathon
 
-This section is written to answer each bonus consideration explicitly, not just gesture at "scalability" in general. A judge reading REQ.md's checklist should be able to match every line to a concrete answer here.
+This section is written to answer each scalability consideration explicitly, not just gesture at "scalability" in general. Every claim below maps to a concrete answer, not a vague gesture.
 
 ### Phased roadmap
 
@@ -379,14 +382,14 @@ This section is written to answer each bonus consideration explicitly, not just 
 
 **Team, for real execution beyond the hackathon (this is what makes "feasible beyond the hackathon" a plan, not a slogan):** 2 contract engineers (core settlement; compliance + mandate integration), 1 dedicated security engineer, 1 backend engineer (indexer, receipt service, observability), 1–2 frontend engineers, 1 compliance/protocol designer (real FATF Travel Rule + MAS regulatory depth, not just API plumbing), 1 BD/partnerships lead, 1 PM/writer. None of this requires reinventing the architecture — every role extends what's already speced in §5.
 
-### Mapped directly to REQ.md's bonus checklist
+### Where this stands on the things that actually matter for scaling
 
-- **Use Cleanverse Primitives Meaningfully** — CVI gates protocol entry via a real on-chain `RuleV2` (§1, §5.1); CVA is the only settlement asset with real transfer-hook enforcement (§4); the compliance validator is called directly on-chain, not assumed via REST (§3). Depth, not decoration.
-- **Solve Real Financial Infrastructure Problems** — $150B remittance corridor with no compliant stablecoin rail today (§2, Problem A); zero compliant agent-payment options against 160M+ agentic transactions already happening (§2, Problem B).
-- **Can Be Piloted With Institutions Or Merchants** — the product is architecturally pilot-ready (real on-chain enforcement a remittance operator or employer could integrate against today, §5.1), but actual outreach has not yet happened — §8 explicitly deprioritizes it below shipping given how much of the build window had already elapsed when this was assessed. One real "we'd pilot this" would outweigh any amount of Solidity for this specific signal; stated honestly as a real gap, not claimed as done.
-- **Improve Trust, Compliance, Or Interoperability** — trust: on-chain enforcement independent of the backend (§3); compliance: real Travel Rule report retrieval + privacy-correct anchoring (§3, §5.1); interoperability: a compliant x402 extension other builders can adopt (Phase 3, above), and a chain-agnostic architecture honest about being single-chain now by choice, not limitation (§1).
-- **Demonstrate Clear User Value** — named users with named pain points, not abstract personas (§2): remittance senders paying real fees (World Bank RPW global average: 6.36%) and waiting days; enterprises that currently have no way to let an agent spend money compliantly at all.
-- **Are Technically Feasible Beyond The Hackathon** — a concrete fee mechanism already live in the MVP (§5.1), not a narrative promise; a phased roadmap with named team roles and named next technical steps, not a vague "and then it scales" gesture; an honest disclosure of the one thing that's genuinely hackathon-only (the single admin key) paired with the specific fix (multisig migration) rather than hiding it.
+- **Uses Cleanverse primitives meaningfully** — CVI gates protocol entry via a real on-chain `RuleV2` (§1, §5.1); CVA is the only settlement asset with real transfer-hook enforcement (§4); the compliance validator is called directly on-chain, not assumed via REST (§3). Depth, not decoration.
+- **Solves a real financial infrastructure problem** — $150B remittance corridor with no compliant stablecoin rail today (§2, Problem A); zero compliant agent-payment options against 160M+ agentic transactions already happening (§2, Problem B).
+- **Can be piloted with institutions or merchants** — the product is architecturally pilot-ready (real on-chain enforcement a remittance operator or employer could integrate against today, §5.1), but actual outreach has not yet happened — §8 explicitly deprioritizes it below shipping given how much of the build window had already elapsed when this was assessed. One real "we'd pilot this" would outweigh any amount of Solidity here; stated honestly as a real gap, not claimed as done.
+- **Improves trust, compliance, and interoperability** — trust: on-chain enforcement independent of the backend (§3); compliance: real Travel Rule report retrieval + privacy-correct anchoring (§3, §5.1); interoperability: a compliant x402 extension other builders can adopt (Phase 3, above), and a chain-agnostic architecture honest about being single-chain now by choice, not limitation (§1).
+- **Demonstrates clear user value** — named users with named pain points, not abstract personas (§2): remittance senders paying real fees (World Bank RPW global average: 6.36%) and waiting days; enterprises that currently have no way to let an agent spend money compliantly at all.
+- **Is technically feasible beyond the hackathon** — a concrete fee mechanism already live in the MVP (§5.1), not a narrative promise; a phased roadmap with named team roles and named next technical steps, not a vague "and then it scales" gesture; an honest disclosure of the one thing that's genuinely hackathon-only (the single admin key) paired with the specific fix (multisig migration) rather than hiding it.
 
 **Business anchor:** remittance TAM $150B; agent payments growing from 160M+ tx/yr with zero compliant options today. Comparable: Notabene reached 2,300+ institutions selling compliance *messaging* alone — Legate sells messaging AND settlement, with a working fee mechanism from day one, not a deferred one.
 

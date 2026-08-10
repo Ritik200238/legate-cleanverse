@@ -8,10 +8,10 @@ import {LegateEscrow} from "./LegateEscrow.sol";
 /// @title AgentMandate
 /// @notice Programmable spend mandates for AI agents acting on behalf of a verified
 ///         principal. Confirmed absent from Cleanverse's API entirely (zero mentions of
-///         "agent," "mandate," or "spend control" anywhere in the 3577-line API reference,
+///         "agent," "mandate," or "spend control" anywhere in Cleanverse's API reference,
 ///         see DECISIONS.md) — this is not a fallback, it IS the plan: the reference
 ///         implementation of a capability Cleanverse doesn't provide. See PRD.md §5.1, §6
-///         (Scene 4), REQ.md capability #8.
+///         (Scene 4).
 ///
 /// @dev    Structurally this is Safe's **module**, and `ComplianceGate` is the matching
 ///         **guard**. The distinction is the whole architecture and it is worth naming

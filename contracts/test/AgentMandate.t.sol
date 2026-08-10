@@ -75,7 +75,7 @@ contract AgentMandateTest is Test {
         mandateContract.createMandate(agent, PER_TX_CAP, DAILY_CAP, TOTAL_CAP, uint64(block.timestamp + 30 days));
     }
 
-    // --- Cap boundaries: exactly what CLAUDE.md requires tested, not just claimed ---
+    // --- Cap boundaries: tested at every edge, not just the happy path ---
 
     function test_RevertWhen_PerTxCapExceeded() public {
         _createMandate();
@@ -171,7 +171,7 @@ contract AgentMandateTest is Test {
         mandateContract.suspendByMirror(agent);
     }
 
-    // --- Mandate-hijacking fix (real, proven bug found by adversarial review, see DECISIONS.md):
+    // --- Mandate-hijacking fix (real, proven bug found during a security review, see DECISIONS.md):
     //     `mandates` is keyed only by agent address, so createMandate() must reject anyone
     //     other than the true principal trying to overwrite a still-live mandate. ---
 

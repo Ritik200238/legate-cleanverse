@@ -69,7 +69,7 @@ contract LegateEscrowTest is Test {
         assertEq(aToken.balanceOf(address(escrow)), 0);
     }
 
-    // --- Negative paths: this is what CLAUDE.md requires, not just the happy path ---
+    // --- Negative paths: every revert condition, not just the happy path ---
 
     function test_RevertWhen_SenderNotCompliant() public {
         vm.prank(unverified);
@@ -225,7 +225,7 @@ contract LegateEscrowTest is Test {
         assertEq(evilToken.balanceOf(recipient), 0);
     }
 
-    // --- Fee-stranding fix (real, proven bug found by adversarial review, see DECISIONS.md):
+    // --- Fee-stranding fix (real, proven bug found during a security review, see DECISIONS.md):
     //     settle()/settleFromMandate() must not deduct a fee from the recipient when no
     //     feeAddress is configured — otherwise the deducted amount is permanently stuck in
     //     the contract's own balance, unattached to any payment, unrecoverable. ---
@@ -301,8 +301,8 @@ contract LegateEscrowTest is Test {
     }
 
     // --- reclaimExpired(): self-service recovery for a stuck payment, real pilot-readiness
-    //     gap found by the adversarial review (no recourse existed before except an admin
-    //     manually freezing then refunding). Sender-only, window-gated. ---
+    //     gap found during review (no recourse existed before except an admin manually
+    //     freezing then refunding). Sender-only, window-gated. ---
 
     function test_ReclaimExpired_SenderRecoversFundsAfterWindowPasses() public {
         vm.prank(sender);

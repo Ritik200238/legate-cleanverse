@@ -118,7 +118,7 @@ contract LegateEscrow is AccessControl, Ownable, ReentrancyGuard {
         totalEscrowed += amount;
 
         // Effects (state written above) before interaction (external token pull) —
-        // checks-effects-interactions, per CLAUDE.md's security requirements.
+        // standard checks-effects-interactions.
         aToken.safeTransferFrom(msg.sender, address(this), amount);
 
         emit PaymentEscrowed(paymentId, msg.sender, recipient, amount);

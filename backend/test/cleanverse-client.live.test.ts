@@ -13,9 +13,8 @@ import {
 import type { CleanverseConfig } from "../src/cleanverse/client.js";
 
 /**
- * LIVE tests against Cleanverse's real UAT sandbox — not mocks. Per CLAUDE.md: "don't guess,
- * verify against real sources." These prove the TypeScript client's request/response shapes
- * actually match reality, not just that they compile.
+ * LIVE tests against Cleanverse's real UAT sandbox — not mocks. These prove the TypeScript
+ * client's request/response shapes actually match reality, not just that they compile.
  */
 
 const config: CleanverseConfig = {
